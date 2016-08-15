@@ -23,12 +23,18 @@ export class WorkerManager {
 	private _worker: monaco.editor.MonacoWebWorker<TypeScriptWorker>;
 	private _client: Promise<TypeScriptWorker>;
 
-	constructor(defaults: LanguageServiceDefaultsImpl) {
+	private _stopWhenIdleFor: number;
+
+	constructor(defaults: LanguageServiceDefaultsImpl, stopWhenIdleFor?: number) {
 		this._defaults = defaults;
 		this._worker = null;
-		this._idleCheckInterval = setInterval(() => this._checkIfIdle(), 30 * 1000);
 		this._lastUsedTime = 0;
 		this._configChangeListener = this._defaults.onDidChange(() => this._stopWorker());
+
+		this._stopWhenIdleFor = (stopWhenIdleFor || stopWhenIdleFor === 0) ? stopWhenIdleFor : STOP_WHEN_IDLE_FOR;
+		if (this._stopWhenIdleFor) {
+ 			this._idleCheckInterval = setInterval(() => this._checkIfIdle(), 30 * 1000);
+ 		}
 	}
 
 	private _stopWorker(): void {
@@ -40,7 +46,9 @@ export class WorkerManager {
 	}
 
 	dispose(): void {
-		clearInterval(this._idleCheckInterval);
+		if (this._idleCheckInterval) {
+ 			clearInterval(this._idleCheckInterval);
+ 		}
 		this._configChangeListener.dispose();
 		this._stopWorker();
 	}
@@ -50,7 +58,7 @@ export class WorkerManager {
 			return;
 		}
 		let timePassedSinceLastUsed = Date.now() - this._lastUsedTime;
-		if (timePassedSinceLastUsed > STOP_WHEN_IDLE_FOR) {
+		if (timePassedSinceLastUsed > this._stopWhenIdleFor) {
 			this._stopWorker();
 		}
 	}
