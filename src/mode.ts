@@ -16,11 +16,11 @@ import IDisposable = monaco.IDisposable;
 
 let scriptWorkerMap : {[name: string]: (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker>} = {};
 
-export function setupNamedLanguage(langaugeName: string, languageType: Language, defaults:LanguageServiceDefaultsImpl): void {
+export function setupNamedLanguage(langaugeName: string, isTypescript: boolean, defaults:LanguageServiceDefaultsImpl): void {
 	scriptWorkerMap[langaugeName + "Worker"] = setupMode(
 		defaults,
 		langaugeName,
-		languageType
+		isTypescript ? Language.TypeScript : Language.EcmaScript5
 	);
 }
 

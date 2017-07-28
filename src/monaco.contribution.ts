@@ -5,7 +5,6 @@
 'use strict';
 
 import * as mode from './mode';
-import {Language} from './tokenization';
 
 import Emitter = monaco.Emitter;
 import IEvent = monaco.IEvent;
@@ -183,10 +182,13 @@ function getLanguageDefaults(languageName: string) : LanguageServiceDefaultsImpl
 	return languageDefaults[languageName];
 }
 
-function setupNamedLanguage(languageDefinition: monaco.languages.ILanguageExtensionPoint, isTypescript: boolean, defaults: LanguageServiceDefaultsImpl): void {
+function setupNamedLanguage(languageDefinition: monaco.languages.ILanguageExtensionPoint, isTypescript: boolean): void {
 	monaco.languages.register(languageDefinition);
+
+	languageDefaults[languageDefinition.id] = isTypescript? languageDefaults["typescript"] : languageDefaults["javascript"];
+
 	monaco.languages.onLanguage(languageDefinition.id, () => {
-		withMode((mode) => mode.setupNamedLanguage(languageDefinition.id, isTypescript ? Language.TypeScript : Language.EcmaScript5, defaults));
+		withMode((mode) => mode.setupNamedLanguage(languageDefinition.id, isTypescript, languageDefaults[languageDefinition.id]));
 	});
 }
 
@@ -220,7 +222,7 @@ setupNamedLanguage({
 	extensions: ['.ts', '.tsx'],
 	aliases: ['TypeScript', 'ts', 'typescript'],
 	mimetypes: ['text/typescript']
-}, true, languageDefaults["typescript"]);
+}, true);
 
 setupNamedLanguage({
 	id: 'javascript',
@@ -229,4 +231,4 @@ setupNamedLanguage({
 	filenames: ['jakefile'],
 	aliases: ['JavaScript', 'javascript', 'js'],
 	mimetypes: ['text/javascript'],
-}, false, languageDefaults["javascript"]);
+}, false);
