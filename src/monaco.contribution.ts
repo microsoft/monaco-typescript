@@ -5,6 +5,7 @@
 'use strict';
 
 import * as mode from './mode';
+import {Language} from './tokenization';
 
 import Emitter = monaco.Emitter;
 import IEvent = monaco.IEvent;
@@ -151,29 +152,41 @@ enum ModuleResolutionKind {
 }
 // --- END enums copied from typescript to prevent loading the entire typescriptServices ---
 
-const typescriptDefaults = new LanguageServiceDefaultsImpl(
+const languageDefaults: {[name: string]: LanguageServiceDefaultsImpl } = {}
+
+languageDefaults["typescript"] = new LanguageServiceDefaultsImpl(
 	{ allowNonTsExtensions: true, target: ScriptTarget.Latest },
 	{ noSemanticValidation: false, noSyntaxValidation: false });
 
-const javascriptDefaults = new LanguageServiceDefaultsImpl(
+languageDefaults["javascript"] = new LanguageServiceDefaultsImpl(
 	{ allowNonTsExtensions: true, allowJs: true, target: ScriptTarget.Latest },
 	{ noSemanticValidation: true, noSyntaxValidation: false });
 
 function getTypeScriptWorker(): monaco.Promise<any> {
+	return getLanguageWorker("typescript");
+}
+
+function getJavaScriptWorker(): monaco.Promise<any> {
+	return getLanguageWorker("javascript");
+}
+
+function getLanguageWorker(languageName: string): monaco.Promise<any> {
 	return new monaco.Promise((resolve, reject) => {
 		withMode((mode) => {
-			mode.getTypeScriptWorker()
+			mode.getNamedLanguageWorker(languageName)
 				.then(resolve, reject);
 		});
 	});
 }
 
-function getJavaScriptWorker(): monaco.Promise<any> {
-	return new monaco.Promise((resolve, reject) => {
-		withMode((mode) => {
-			mode.getJavaScriptWorker()
-				.then(resolve, reject);
-		});
+function getLanguageDefaults(languageName: string) : LanguageServiceDefaultsImpl {
+	return languageDefaults[languageName];
+}
+
+function setupNamedLanguage(languageDefinition: monaco.languages.ILanguageExtensionPoint, isTypescript: boolean, defaults: LanguageServiceDefaultsImpl): void {
+	monaco.languages.register(languageDefinition);
+	monaco.languages.onLanguage(languageDefinition.id, () => {
+		withMode((mode) => mode.setupNamedLanguage(languageDefinition.id, isTypescript ? Language.TypeScript : Language.EcmaScript5, defaults));
 	});
 }
 
@@ -185,10 +198,13 @@ function createAPI(): typeof monaco.languages.typescript {
 		NewLineKind: NewLineKind,
 		ScriptTarget: ScriptTarget,
 		ModuleResolutionKind: ModuleResolutionKind,
-		typescriptDefaults: typescriptDefaults,
-		javascriptDefaults: javascriptDefaults,
+		typescriptDefaults: getLanguageDefaults("typescript"),
+		javascriptDefaults: getLanguageDefaults("javascript"),
+		getLanguageDefaults: getLanguageDefaults,
 		getTypeScriptWorker: getTypeScriptWorker,
-		getJavaScriptWorker: getJavaScriptWorker
+		getJavaScriptWorker: getJavaScriptWorker,
+		getLanguageWorker: getLanguageWorker,
+		setupNamedLanguage: setupNamedLanguage
 	}
 }
 monaco.languages.typescript = createAPI();
@@ -199,24 +215,18 @@ function withMode(callback: (module: typeof mode) => void): void {
 	require<typeof mode>(['vs/language/typescript/src/mode'], callback);
 }
 
-monaco.languages.register({
+setupNamedLanguage({
 	id: 'typescript',
 	extensions: ['.ts', '.tsx'],
 	aliases: ['TypeScript', 'ts', 'typescript'],
 	mimetypes: ['text/typescript']
-});
-monaco.languages.onLanguage('typescript', () => {
-	withMode((mode) => mode.setupTypeScript(typescriptDefaults));
-});
+}, true, languageDefaults["typescript"]);
 
-monaco.languages.register({
+setupNamedLanguage({
 	id: 'javascript',
 	extensions: ['.js', '.es6', '.jsx'],
 	firstLine: '^#!.*\\bnode',
 	filenames: ['jakefile'],
 	aliases: ['JavaScript', 'javascript', 'js'],
 	mimetypes: ['text/javascript'],
-});
-monaco.languages.onLanguage('javascript', () => {
-	withMode((mode) => mode.setupJavaScript(javascriptDefaults));
-});
+}, false, languageDefaults["javascript"]);
