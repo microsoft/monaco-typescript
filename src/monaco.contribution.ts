@@ -4,13 +4,11 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
-import * as mode from './mode';
+import * as mode from './tsMode';
 
 import Emitter = monaco.Emitter;
 import IEvent = monaco.IEvent;
 import IDisposable = monaco.IDisposable;
-
-declare var require: <T>(moduleId: [string], callback: (module: T) => void) => void;
 
 // --- TypeScript configuration and defaults ---------
 
@@ -170,12 +168,7 @@ function getJavaScriptWorker(): monaco.Promise<any> {
 }
 
 function getLanguageWorker(languageName: string): monaco.Promise<any> {
-	return new monaco.Promise((resolve, reject) => {
-		withMode((mode) => {
-			mode.getNamedLanguageWorker(languageName)
-				.then(resolve, reject);
-		});
-	});
+	return getMode().then(mode => mode.getNamedLanguageWorker(languageName));
 }
 
 function getLanguageDefaults(languageName: string) : LanguageServiceDefaultsImpl {
@@ -185,10 +178,10 @@ function getLanguageDefaults(languageName: string) : LanguageServiceDefaultsImpl
 function setupNamedLanguage(languageDefinition: monaco.languages.ILanguageExtensionPoint, isTypescript: boolean): void {
 	monaco.languages.register(languageDefinition);
 
-	languageDefaults[languageDefinition.id] = isTypescript? languageDefaults["typescript"] : languageDefaults["javascript"];
+	languageDefaults[languageDefinition.id] = isTypescript ? languageDefaults["typescript"] : languageDefaults["javascript"];
 
 	monaco.languages.onLanguage(languageDefinition.id, () => {
-		withMode((mode) => mode.setupNamedLanguage(languageDefinition.id, isTypescript, languageDefaults[languageDefinition.id]));
+		return getMode().then(mode => mode.setupNamedLanguage(languageDefinition.id, isTypescript, languageDefaults[languageDefinition.id]));
 	});
 }
 
@@ -213,8 +206,8 @@ monaco.languages.typescript = createAPI();
 
 // --- Registration to monaco editor ---
 
-function withMode(callback: (module: typeof mode) => void): void {
-	require<typeof mode>(['vs/language/typescript/src/mode'], callback);
+function getMode(): monaco.Promise<typeof mode> {
+	return monaco.Promise.wrap(import('./tsMode'))
 }
 
 setupNamedLanguage({

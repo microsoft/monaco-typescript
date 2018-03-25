@@ -7,15 +7,24 @@
 </head>
 <body>
 
-<h2>Monaco Editor HTML test page</h2>
+<h2>Monaco Editor TypeScript test page</h2>
 <div id="container" style="width:800px;height:600px;border:1px solid grey"></div>
 
 <script>
-	var require = {
-		paths: {
-			'vs/language/typescript': '../out',
-			'vs': '../node_modules/monaco-editor-core/dev/vs'
+	var paths = {
+		'vs/language/typescript': '../release/dev',
+		'vs': '../node_modules/monaco-editor-core/dev/vs'
+	};
+	if (document.location.protocol === 'http:') {
+		// Add support for running local http server
+		let testIndex = document.location.pathname.indexOf('/test/');
+		if (testIndex !== -1) {
+			let prefix = document.location.pathname.substr(0, testIndex);
+			paths['vs/language/typescript'] = prefix + '/release/dev';
 		}
+	}
+	var require = {
+		paths: paths
 	};
 </script>
 <script src="../node_modules/monaco-editor-core/dev/vs/loader.js"></script>
@@ -24,7 +33,7 @@
 
 <script>
 	require([
-		'vs/language/typescript/src/monaco.contribution'
+		'vs/language/typescript/monaco.contribution'
 	], function() {
 		var editor = monaco.editor.create(document.getElementById('container'), {
 			value: [

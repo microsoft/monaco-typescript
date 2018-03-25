@@ -5,8 +5,8 @@
 'use strict';
 
 import { LanguageServiceDefaultsImpl } from './monaco.contribution';
-import * as ts from '../lib/typescriptServices';
-import { TypeScriptWorker } from './worker';
+import * as ts from './lib/typescriptServices';
+import { TypeScriptWorker } from './tsWorker';
 
 import Uri = monaco.Uri;
 import Position = monaco.Position;
@@ -329,7 +329,11 @@ export class QuickInfoAdapter extends Adapter implements monaco.languages.HoverP
 			let contents = ts.displayPartsToString(info.displayParts);
 			return {
 				range: this._textSpanToRange(resource, info.textSpan),
-				contents: [ contents, documentation + (tags ? '\n\n' + tags : '') ]
+				contents: [{
+					value: contents
+				}, {
+					value: documentation + (tags ? '\n\n' + tags : '')
+				}]
 			};
 		}));
 	}
@@ -429,7 +433,7 @@ export class OutlineAdapter extends Adapter implements monaco.languages.Document
 			const convert = (bucket: monaco.languages.SymbolInformation[], item: ts.NavigationBarItem, containerLabel?: string): void => {
 				let result: monaco.languages.SymbolInformation = {
 					name: item.text,
-					kind: outlineTypeTable[item.kind] || monaco.languages.SymbolKind.Variable,
+					kind: <monaco.languages.SymbolKind>(outlineTypeTable[item.kind] || monaco.languages.SymbolKind.Variable),
 					location: {
 						uri: resource,
 						range: this._textSpanToRange(resource, item.spans[0])

@@ -147,10 +147,10 @@ declare module monaco.languages.typescript {
     export var typescriptDefaults: LanguageServiceDefaults;
     export var javascriptDefaults: LanguageServiceDefaults;
 
-    export var getTypeScriptWorker: () => monaco.Promise<any>;
-    export var getJavaScriptWorker: () => monaco.Promise<any>;
+    export var getTypeScriptWorker: () => Promise<any>;
+    export var getJavaScriptWorker: () => Promise<any>;
 
-    export var getLanguageWorker: (langaugeName: string) => monaco.Promise<any>;
-    export var setupNamedLanguage: (languageDefinition: monaco.languages.ILanguageExtensionPoint, isTypescript: boolean, defaults: LanguageServiceDefaults) => void;
+    export var getLanguageWorker: (langaugeName: string) => Promise<any>;
+    export var setupNamedLanguage: (languageDefinition: languages.ILanguageExtensionPoint, isTypescript: boolean, defaults: LanguageServiceDefaults) => void;
     export var getLanguageDefaults: (languageName: string) => LanguageServiceDefaults;
 }

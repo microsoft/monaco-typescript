@@ -1,11 +1,15 @@
 {
-  "name": "monaco-typescript",
-  "version": "2.3.0-placatus",
+  "name": "monaco-typescript-placatus",
+  "version": "3.0.2",
   "description": "TypeScript and JavaScript language support for Monaco Editor",
   "scripts": {
-    "test": "node_modules/.bin/mocha",
-    "watch": "node_modules/.bin/gulp watch",
-    "prepublish": "node_modules/.bin/gulp release"
+    "test": "mocha",
+    "compile-amd": "mcopy ./src/lib/typescriptServices-amd.js ./release/dev/lib/typescriptServices.js && tsc -p ./src/tsconfig.json",
+    "compile-esm": "mcopy ./src/lib/typescriptServices.js ./release/esm/lib/typescriptServices.js && tsc -p ./src/tsconfig.esm.json",
+    "compile": "mrmdir ./release && npm run compile-amd && npm run compile-esm",
+    "watch": "tsc -p ./src --watch",
+    "prepublish": "npm run compile && node ./scripts/bundle && mcopy ./src/monaco.d.ts ./release/monaco.d.ts",
+    "import-typescript": "node ./scripts/importTypescript"
   },
   "author": "Microsoft Corporation",
   "license": "MIT",
@@ -17,16 +21,11 @@
     "url": "https://github.com/Microsoft/monaco-typescript/issues"
   },
   "devDependencies": {
-    "event-stream": "^3.3.2",
-    "gulp": "^3.9.1",
-    "gulp-requirejs": "^0.4.0",
-    "gulp-tsb": "^2.0.0",
-    "gulp-uglify": "^1.5.3",
-    "merge-stream": "^1.0.0",
     "mocha": "^2.5.3",
-    "monaco-editor-core": "^0.10.0",
-    "object-assign": "^4.1.0",
-    "rimraf": "^2.5.2",
-    "typescript": "2.4.1"
+    "monaco-editor-core": "0.11.1",
+    "monaco-plugin-helpers": "^1.0.2",
+    "requirejs": "^2.3.5",
+    "typescript": "2.7.2",
+    "uglify-js": "^3.3.14"
   }
 }
