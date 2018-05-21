@@ -186,6 +186,39 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 	getEmitOutput(fileName: string): Promise<ts.EmitOutput> {
 		return Promise.as(this._languageService.getEmitOutput(fileName));
 	}
+
+	getPropertiesOrAttributesOf(fileName: string, parentObjects: string[]) {
+		let currentFile = this._languageService.getProgram().getSourceFile(fileName);
+		let referencedEntities = {};
+        parentObjects.forEach(function (key) { referencedEntities[key] = {}; });
+		ts.forEachChild(currentFile, function visitNodes(node: ts.Node) {
+			if (ts.isPropertyAccessExpression(node) && referencedEntities[node.expression.getText()]) {
+				// Matches Things.test
+				if (!(node.name.text in referencedEntities[node.expression.getText()])) {
+					referencedEntities[node.expression.getText()][node.name.text] = true;
+				}
+			} else if (ts.isElementAccessExpression(node) && referencedEntities[node.expression.getText()] && node.argumentExpression) {
+				if (node.argumentExpression.kind == ts.SyntaxKind.Identifier) {
+					if (node.expression.getText() == "Users" && node.argumentExpression.getText() == "principal") {
+						// a special case for Users[principal] => replace principal with "Administrator",
+						// since all users have the same properties and functions
+						referencedEntities["Users"]["System"] = true;
+					}
+				}
+				if (node.argumentExpression.kind == ts.SyntaxKind.PropertyAccessExpression) {
+					// TODO: matches Things[me.property]
+				} else if (ts.isStringLiteral(node)) {
+					if (!(node.argumentExpression.getText() in referencedEntities[node.expression.getText()])) {
+						// matches Things["test"]
+						referencedEntities[node.expression.getText()][node.argumentExpression.getText()] = true;
+					}
+				}
+			}
+			return ts.forEachChild(node, visitNodes);
+		});
+
+		return referencedEntities;
+	}
 }
 
 export interface ICreateData {
