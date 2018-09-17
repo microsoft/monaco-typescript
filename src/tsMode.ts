@@ -4,22 +4,20 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
-import {Language, createTokenizationSupport} from './tokenization';
-import {WorkerManager} from './workerManager';
-import {TypeScriptWorker} from './tsWorker';
-import {LanguageServiceDefaultsImpl} from './monaco.contribution';
+import { WorkerManager } from './workerManager';
+import { TypeScriptWorker } from './tsWorker';
+import { LanguageServiceDefaultsImpl } from './monaco.contribution';
 import * as languageFeatures from './languageFeatures';
 
 import Promise = monaco.Promise;
 import Uri = monaco.Uri;
 
-let scriptWorkerMap : {[name: string]: (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker>} = {};
+let scriptWorkerMap: { [name: string]: (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker> } = {};
 
-export function setupNamedLanguage(langaugeName: string, isTypescript: boolean, defaults:LanguageServiceDefaultsImpl): void {
+export function setupNamedLanguage(langaugeName: string, isTypescript: boolean, defaults: LanguageServiceDefaultsImpl): void {
 	scriptWorkerMap[langaugeName + "Worker"] = setupMode(
 		defaults,
-		langaugeName,
-		isTypescript ? Language.TypeScript : Language.EcmaScript5
+		langaugeName
 	);
 }
 
@@ -34,7 +32,7 @@ export function getNamedLanguageWorker(languageName: string): Promise<(first: Ur
 	});
 }
 
-function setupMode(defaults:LanguageServiceDefaultsImpl, modeId:string, language:Language): (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker> {
+function setupMode(defaults: LanguageServiceDefaultsImpl, modeId: string): (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker> {
 
 	const client = new WorkerManager(modeId, defaults);
 	const worker = (first: Uri, ...more: Uri[]): Promise<TypeScriptWorker> => {
@@ -51,64 +49,6 @@ function setupMode(defaults:LanguageServiceDefaultsImpl, modeId:string, language
 	monaco.languages.registerDocumentRangeFormattingEditProvider(modeId, new languageFeatures.FormatAdapter(worker));
 	monaco.languages.registerOnTypeFormattingEditProvider(modeId, new languageFeatures.FormatOnTypeAdapter(worker));
 	new languageFeatures.DiagnostcsAdapter(defaults, modeId, worker);
-	monaco.languages.setLanguageConfiguration(modeId, richEditConfiguration);
-	monaco.languages.setTokensProvider(modeId, createTokenizationSupport(language));
 
 	return worker;
 }
-
-const richEditConfiguration:monaco.languages.LanguageConfiguration = {
-	wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
-
-	comments: {
-		lineComment: '//',
-		blockComment: ['/*', '*/']
-	},
-
-	brackets: [
-		['{', '}'],
-		['[', ']'],
-		['(', ')']
-	],
-
-	onEnterRules: [
-		{
-			// e.g. /** | */
-			beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-			afterText: /^\s*\*\/$/,
-			action: { indentAction: monaco.languages.IndentAction.IndentOutdent, appendText: ' * ' }
-		},
-		{
-			// e.g. /** ...|
-			beforeText: /^\s*\/\*\*(?!\/)([^\*]|\*(?!\/))*$/,
-			action: { indentAction: monaco.languages.IndentAction.None, appendText: ' * ' }
-		},
-		{
-			// e.g.  * ...|
-			beforeText: /^(\t|(\ \ ))*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
-			action: { indentAction: monaco.languages.IndentAction.None, appendText: '* ' }
-		},
-		{
-			// e.g.  */|
-			beforeText: /^(\t|(\ \ ))*\ \*\/\s*$/,
-			action: { indentAction: monaco.languages.IndentAction.None, removeText: 1 }
-		}
-	],
-
-	autoClosingPairs: [
-		{ open: '{', close: '}' },
-		{ open: '[', close: ']' },
-		{ open: '(', close: ')' },
-		{ open: '"', close: '"', notIn: ['string'] },
-		{ open: '\'', close: '\'', notIn: ['string', 'comment'] },
-		{ open: '`', close: '`', notIn: ['string', 'comment'] },
-		{ open: "/**", close: " */", notIn: ["string"] }
-	],
-
-	folding: {
-		markers: {
-			start: new RegExp("^\\s*//\\s*#?region\\b"),
-			end: new RegExp("^\\s*//\\s*#?endregion\\b")
-		}
-	}
-};

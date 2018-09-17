@@ -5,20 +5,19 @@
 'use strict';
 
 import * as ts from './lib/typescriptServices';
-import { contents as libdts } from './lib/lib-ts';
-import { contents as libes6ts } from './lib/lib-es6-ts';
+import { lib_dts, lib_es6_dts } from './lib/lib';
 
 import Promise = monaco.Promise;
 import IWorkerContext = monaco.worker.IWorkerContext;
 
 const DEFAULT_LIB = {
 	NAME: 'defaultLib:lib.d.ts',
-	CONTENTS: libdts
+	CONTENTS: lib_dts
 };
 
 const ES6_LIB = {
 	NAME: 'defaultLib:lib.es6.d.ts',
-	CONTENTS: libes6ts
+	CONTENTS: lib_es6_dts
 };
 
 export class TypeScriptWorker implements ts.LanguageServiceHost {
@@ -121,21 +120,33 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 
 	// --- language features
 
+	private static clearFiles(diagnostics: ts.Diagnostic[]) {
+		// Clear the `file` field, which cannot be JSON'yfied because it
+		// contains cyclic data structures.
+		diagnostics.forEach(diag => {
+			diag.file = undefined;
+			const related = <ts.Diagnostic[]>diag.relatedInformation;
+			if (related) {
+				related.forEach(diag2 => diag2.file = undefined);
+			}
+		});
+	}
+
 	getSyntacticDiagnostics(fileName: string): Promise<ts.Diagnostic[]> {
 		const diagnostics = this._languageService.getSyntacticDiagnostics(fileName);
-		diagnostics.forEach(diag => diag.file = undefined); // diag.file cannot be JSON'yfied
+		TypeScriptWorker.clearFiles(diagnostics);
 		return Promise.as(diagnostics);
 	}
 
 	getSemanticDiagnostics(fileName: string): Promise<ts.Diagnostic[]> {
 		const diagnostics = this._languageService.getSemanticDiagnostics(fileName);
-		diagnostics.forEach(diag => diag.file = undefined); // diag.file cannot be JSON'yfied
+		TypeScriptWorker.clearFiles(diagnostics);
 		return Promise.as(diagnostics);
 	}
 
 	getCompilerOptionsDiagnostics(fileName: string): Promise<ts.Diagnostic[]> {
 		const diagnostics = this._languageService.getCompilerOptionsDiagnostics();
-		diagnostics.forEach(diag => diag.file = undefined); // diag.file cannot be JSON'yfied
+		TypeScriptWorker.clearFiles(diagnostics);
 		return Promise.as(diagnostics);
 	}
 
@@ -144,11 +155,11 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 	}
 
 	getCompletionEntryDetails(fileName: string, position: number, entry: string): Promise<ts.CompletionEntryDetails> {
-		return Promise.as(this._languageService.getCompletionEntryDetails(fileName, position, entry, undefined, undefined));
+		return Promise.as(this._languageService.getCompletionEntryDetails(fileName, position, entry, undefined, undefined, undefined));
 	}
 
 	getSignatureHelpItems(fileName: string, position: number): Promise<ts.SignatureHelpItems> {
-		return Promise.as(this._languageService.getSignatureHelpItems(fileName, position));
+		return Promise.as(this._languageService.getSignatureHelpItems(fileName, position, undefined));
 	}
 
 	getQuickInfoAtPosition(fileName: string, position: number): Promise<ts.QuickInfo> {
