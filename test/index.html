@@ -37,6 +37,7 @@
 		'vs/basic-languages/monaco.contribution',
 		'vs/language/typescript/monaco.contribution'
 	], function() {
+		monaco.languages.typescript.setupNamedLanguage({ id: "twxTypescript" }, true, true);
 		var editor = monaco.editor.create(document.getElementById('container'), {
 			value: [
 				'/* Game of Life',
@@ -165,7 +166,7 @@
 				'var game = new Conway.GameOfLife();',
 
 			].join('\n'),
-			language: 'typescript'
+			language: 'twxTypescript'
 		});
 	});
 </script>

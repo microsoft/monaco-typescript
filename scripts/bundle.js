@@ -36,7 +36,8 @@ function bundleOne(moduleId, exclude) {
 		out: 'release/min/' + moduleId + '.js',
 		exclude: exclude,
 		paths: {
-			'vs/language/typescript': REPO_ROOT + '/release/dev'
+			'vs/language/typescript': REPO_ROOT + '/release/dev',
+			'vs/basic-languages': REPO_ROOT + '/node_modules/monaco-languages/release/dev'
 		},
 		optimize: 'none'
 	}, function(buildResponse) {

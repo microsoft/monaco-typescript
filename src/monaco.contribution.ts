@@ -5,6 +5,8 @@
 'use strict';
 
 import * as mode from './tsMode';
+import * as tsDefinitions from 'vs/basic-languages/typescript/typescript';
+import * as jsDefinitions from 'vs/basic-languages/javascript/javascript';
 
 import Emitter = monaco.Emitter;
 import IEvent = monaco.IEvent;
@@ -138,7 +140,7 @@ enum ModuleResolutionKind {
 }
 //#endregion
 
-const languageDefaults: {[name: string]: LanguageServiceDefaultsImpl } = {}
+const languageDefaults: { [name: string]: LanguageServiceDefaultsImpl } = {}
 
 languageDefaults["typescript"] = new LanguageServiceDefaultsImpl(
 	{ allowNonTsExtensions: true, target: ScriptTarget.Latest },
@@ -160,12 +162,18 @@ function getLanguageWorker(languageName: string): monaco.Promise<any> {
 	return getMode().then(mode => mode.getNamedLanguageWorker(languageName));
 }
 
-function getLanguageDefaults(languageName: string) : LanguageServiceDefaultsImpl {
+function getLanguageDefaults(languageName: string): LanguageServiceDefaultsImpl {
 	return languageDefaults[languageName];
 }
 
-function setupNamedLanguage(languageDefinition: monaco.languages.ILanguageExtensionPoint, isTypescript: boolean): void {
-	monaco.languages.register(languageDefinition);
+function setupNamedLanguage(languageDefinition: monaco.languages.ILanguageExtensionPoint, isTypescript: boolean, registerLanguage?: boolean): void {
+	if (registerLanguage) {
+		monaco.languages.register(languageDefinition);
+
+		const langageConfig = isTypescript? tsDefinitions : jsDefinitions;
+		monaco.languages.setMonarchTokensProvider(languageDefinition.id, langageConfig.language);
+		monaco.languages.setLanguageConfiguration(languageDefinition.id, langageConfig.conf);
+	}
 
 	languageDefaults[languageDefinition.id] = isTypescript ? languageDefaults["typescript"] : languageDefaults["javascript"];
 
