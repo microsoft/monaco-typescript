@@ -201,7 +201,7 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 	getPropertiesOrAttributesOf(fileName: string, parentObjects: string[]) {
 		let currentFile = this._languageService.getProgram().getSourceFile(fileName);
 		let referencedEntities = {};
-        parentObjects.forEach(function (key) { referencedEntities[key] = {}; });
+		parentObjects.forEach(function (key) { referencedEntities[key] = {}; });
 		ts.forEachChild(currentFile, function visitNodes(node: ts.Node) {
 			if (ts.isPropertyAccessExpression(node) && referencedEntities[node.expression.getText()]) {
 				// Matches Things.test
@@ -218,11 +218,9 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 				}
 				if (node.argumentExpression.kind == ts.SyntaxKind.PropertyAccessExpression) {
 					// TODO: matches Things[me.property]
-				} else if (ts.isStringLiteral(node)) {
-					if (!(node.argumentExpression.getText() in referencedEntities[node.expression.getText()])) {
-						// matches Things["test"]
-						referencedEntities[node.expression.getText()][node.argumentExpression.getText()] = true;
-					}
+				} else if (ts.isStringLiteral(node.argumentExpression)) {
+					// matches Things["test"]
+					referencedEntities[node.expression.getText()][node.argumentExpression.getText().slice(1, -1)] = true;
 				}
 			}
 			return ts.forEachChild(node, visitNodes);
