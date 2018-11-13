@@ -18,6 +18,13 @@ const TYPESCRIPT_LIB_DESTINATION = path.join(__dirname, '../src/lib');
 	importLibs();
 
 	var tsServices = fs.readFileSync(path.join(TYPESCRIPT_LIB_SOURCE, 'typescriptServices.js')).toString();
+	// all models that with names that start with "privateModel" must be made private
+	// first change the external module indicator
+	tsServices = tsServices.replace(/(setExternalModuleIndicator\(sourceFile\) {\r?\n)([^}]*)/m, `$1			// TWX_CHANGE\n			if(sourceFile.fileName.indexOf("privateModel") != -1) {\n				sourceFile.externalModuleIndicator = sourceFile;\n			} else {\n$2\n			}\n			// TWX_CHANGE\n		`);
+	// then the isGlobalSourceFile method
+	tsServices = tsServices.replace(/(return node\.kind === 277 \/\* SourceFile \*\/ && !ts\.isExternalOrCommonJsModule\(node\));/, `// TWX CHANGE\n			$1 && node.fileName.indexOf("privateModel") == -1;\n			// TWX_CHANGE`);
+	// and finally the shouldEmitUnderscoreUnderscoreESModule method
+	tsServices = tsServices.replace(/(if \()(!currentModuleInfo\.exportEquals && ts\.isExternalModule\(currentSourceFile\))\) {/, `// TWX CHANGE\n			$1$2 && currentSourceFile.fileName.indexOf("thingworxTypescript") == -1) {\n			// TWX_CHANGE`);
 
 	// Ensure we never run into the node system...
 	// (this also removes require calls that trick webpack into shimming those modules...)
@@ -52,6 +59,11 @@ export const IndentStyle = ts.IndentStyle;
 export const ScriptKind = ts.ScriptKind;
 export const ScriptTarget = ts.ScriptTarget;
 export const TokenClass = ts.TokenClass;
+export const forEachChild = ts.forEachChild;
+export const isPropertyAccessExpression = ts.isPropertyAccessExpression;
+export const isElementAccessExpression = ts.isElementAccessExpression;
+export const SyntaxKind = ts.SyntaxKind;
+export const isStringLiteral = ts.isStringLiteral;
 // END MONACOCHANGE
 `;
 	fs.writeFileSync(path.join(TYPESCRIPT_LIB_DESTINATION, 'typescriptServices.js'), tsServices_esm);
