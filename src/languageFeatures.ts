@@ -616,3 +616,7 @@ export class FormatOnTypeAdapter extends FormatHelper implements monaco.language
 		});
 	}
 }
+
+export function getVersion() {
+	return ts.version;
+}

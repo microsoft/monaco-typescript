@@ -9,6 +9,7 @@ import * as mode from './tsMode';
 import Emitter = monaco.Emitter;
 import IEvent = monaco.IEvent;
 import IDisposable = monaco.IDisposable;
+import { getVersion } from './languageFeatures';
 
 // --- TypeScript configuration and defaults ---------
 
@@ -165,7 +166,8 @@ function createAPI(): typeof monaco.languages.typescript {
 		typescriptDefaults: typescriptDefaults,
 		javascriptDefaults: javascriptDefaults,
 		getTypeScriptWorker: getTypeScriptWorker,
-		getJavaScriptWorker: getJavaScriptWorker
+		getJavaScriptWorker: getJavaScriptWorker,
+		getVersion: getVersion
 	}
 }
 monaco.languages.typescript = createAPI();

@@ -171,4 +171,6 @@ declare module monaco.languages.typescript {
 
     export var getTypeScriptWorker: () => Promise<any>;
     export var getJavaScriptWorker: () => Promise<any>;
+
+    export function getVersion(): string;
 }
