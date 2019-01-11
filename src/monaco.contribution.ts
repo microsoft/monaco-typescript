@@ -22,12 +22,15 @@ export class LanguageServiceDefaultsImpl implements monaco.languages.typescript.
 	private _eagerModelSync: boolean;
 	private _compilerOptions: monaco.languages.typescript.CompilerOptions;
 	private _diagnosticsOptions: monaco.languages.typescript.DiagnosticsOptions;
+	private _languageId: string;
+	private _eagerExtraLibSync: boolean = true;
 
-	constructor(compilerOptions: monaco.languages.typescript.CompilerOptions, diagnosticsOptions: monaco.languages.typescript.DiagnosticsOptions) {
+	constructor(langualgeId: string, compilerOptions: monaco.languages.typescript.CompilerOptions, diagnosticsOptions: monaco.languages.typescript.DiagnosticsOptions) {
 		this._extraLibs = Object.create(null);
 		this._workerMaxIdleTime = 2 * 60 * 1000;
 		this.setCompilerOptions(compilerOptions);
 		this.setDiagnosticsOptions(diagnosticsOptions);
+		this._languageId = langualgeId;
 	}
 
 	get onDidChange(): IEvent<monaco.languages.typescript.LanguageServiceDefaults> {
@@ -52,15 +55,34 @@ export class LanguageServiceDefaultsImpl implements monaco.languages.typescript.
 		}
 
 		this._extraLibs[filePath] = content;
-		this._onDidChange.fire(this);
+		if (this._eagerExtraLibSync) {
+			this.syncExtraLibs();
+		}
 
 		return {
 			dispose: () => {
-				if (delete this._extraLibs[filePath]) {
-					this._onDidChange.fire(this);
+				if (delete this._extraLibs[filePath] && this._eagerExtraLibSync) {
+					this.syncExtraLibs();
 				}
 			}
 		};
+	}
+
+	async syncExtraLibs() {
+		try {
+			let worker;
+			// we don't care if the get language worker fails.
+			// This happens because the worker initialzies much slower than the addExtraLib calls
+			try {
+				worker = await getLanguageWorker(this._languageId);
+			} catch (ignored) {
+				return;
+			}
+			const client = await worker("");
+			client.syncExtraLibs(this._extraLibs);
+		} catch (error) {
+			console.error(error);
+		}
 	}
 
 	getCompilerOptions(): monaco.languages.typescript.CompilerOptions {
@@ -99,6 +121,10 @@ export class LanguageServiceDefaultsImpl implements monaco.languages.typescript.
 
 	getEagerModelSync() {
 		return this._eagerModelSync;
+	}
+
+	setEagerExtraLibSync(value: boolean) {
+		this._eagerExtraLibSync = value;
 	}
 }
 
@@ -140,15 +166,26 @@ enum ModuleResolutionKind {
 }
 //#endregion
 
-const languageDefaults: { [name: string]: LanguageServiceDefaultsImpl } = {}
+const languageDefaultOptions = {
+	javascript: {
+		compilerOptions: { allowNonTsExtensions: true, allowJs: true, target: ScriptTarget.Latest },
+		diagnosticsOptions: { noSemanticValidation: true, noSyntaxValidation: false },
+	},
+	typescript: {
+		compilerOptions: { allowNonTsExtensions: true, target: ScriptTarget.Latest },
+		diagnosticsOptions: { noSemanticValidation: false, noSyntaxValidation: false }
+	}
+}
 
-languageDefaults["typescript"] = new LanguageServiceDefaultsImpl(
-	{ allowNonTsExtensions: true, target: ScriptTarget.Latest },
-	{ noSemanticValidation: false, noSyntaxValidation: false });
+const languageDefaults: { [name: string]: LanguageServiceDefaultsImpl } = {};
 
-languageDefaults["javascript"] = new LanguageServiceDefaultsImpl(
-	{ allowNonTsExtensions: true, allowJs: true, target: ScriptTarget.Latest },
-	{ noSemanticValidation: true, noSyntaxValidation: false });
+function setupLanguageServiceDefaults(languageId, isTypescript) {
+	const languageOptions = languageDefaultOptions[isTypescript ? "typescript" : "javascript"]
+	languageDefaults[languageId] = new LanguageServiceDefaultsImpl(languageId, languageOptions.compilerOptions, languageOptions.diagnosticsOptions);
+}
+
+setupLanguageServiceDefaults("typescript", true);
+setupLanguageServiceDefaults("javascript", false);
 
 function getTypeScriptWorker(): monaco.Promise<any> {
 	return getLanguageWorker("typescript");
@@ -170,12 +207,12 @@ function setupNamedLanguage(languageDefinition: monaco.languages.ILanguageExtens
 	if (registerLanguage) {
 		monaco.languages.register(languageDefinition);
 
-		const langageConfig = isTypescript? tsDefinitions : jsDefinitions;
+		const langageConfig = isTypescript ? tsDefinitions : jsDefinitions;
 		monaco.languages.setMonarchTokensProvider(languageDefinition.id, langageConfig.language);
 		monaco.languages.setLanguageConfiguration(languageDefinition.id, langageConfig.conf);
 	}
 
-	languageDefaults[languageDefinition.id] = isTypescript ? languageDefaults["typescript"] : languageDefaults["javascript"];
+	setupLanguageServiceDefaults(languageDefinition.id, isTypescript);
 
 	monaco.languages.onLanguage(languageDefinition.id, () => {
 		return getMode().then(mode => mode.setupNamedLanguage(languageDefinition.id, isTypescript, languageDefaults[languageDefinition.id]));

@@ -198,6 +198,10 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 		return Promise.as(this._languageService.getEmitOutput(fileName));
 	}
 
+	syncExtraLibs(extraLibs: { [path: string]: string }) {
+		this._extraLibs = extraLibs;
+	}
+
 	getPropertiesOrAttributesOf(fileName: string, parentObjects: string[]) {
 		let currentFile = this._languageService.getProgram().getSourceFile(fileName);
 		let referencedEntities = {};
