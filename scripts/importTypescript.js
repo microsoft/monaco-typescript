@@ -24,7 +24,7 @@ const TYPESCRIPT_LIB_DESTINATION = path.join(__dirname, '../src/lib');
 	// then the isGlobalSourceFile method
 	tsServices = tsServices.replace(/(return node\.kind === 277 \/\* SourceFile \*\/ && !ts\.isExternalOrCommonJsModule\(node\));/, `// TWX CHANGE\n			$1 && node.fileName.indexOf("privateModel") == -1;\n			// TWX_CHANGE`);
 	// and finally the shouldEmitUnderscoreUnderscoreESModule method
-	tsServices = tsServices.replace(/(if \()(!currentModuleInfo\.exportEquals && ts\.isExternalModule\(currentSourceFile\))\) {/, `// TWX CHANGE\n			$1$2 && currentSourceFile.fileName.indexOf("thingworxTypescript") == -1) {\n			// TWX_CHANGE`);
+	tsServices = tsServices.replace(/(if \()(!currentModuleInfo\.exportEquals && ts\.isExternalModule\(currentSourceFile\))\) {/, `// TWX CHANGE\n			$1$2 && currentSourceFile.fileName.indexOf("privateModel") == -1) {\n			// TWX_CHANGE`);
 
 	// Ensure we never run into the node system...
 	// (this also removes require calls that trick webpack into shimming those modules...)
