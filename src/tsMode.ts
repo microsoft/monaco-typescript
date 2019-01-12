@@ -14,10 +14,10 @@ import Uri = monaco.Uri;
 
 let scriptWorkerMap: { [name: string]: (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker> } = {};
 
-export function setupNamedLanguage(langaugeName: string, isTypescript: boolean, defaults: LanguageServiceDefaultsImpl): void {
-	scriptWorkerMap[langaugeName + "Worker"] = setupMode(
+export function setupNamedLanguage(languageName: string, isTypescript: boolean, defaults: LanguageServiceDefaultsImpl): void {
+	scriptWorkerMap[languageName + "Worker"] = setupMode(
 		defaults,
-		langaugeName
+		languageName
 	);
 }
 

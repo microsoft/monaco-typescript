@@ -6,8 +6,8 @@ define(["require", "exports", "./tokenization", "./workerManager", "./languageFe
     'use strict';
     Object.defineProperty(exports, "__esModule", { value: true });
     var scriptWorkerMap = {};
-    function setupNamedLanguage(langaugeName, isTypescript, defaults) {
-        scriptWorkerMap[langaugeName + "Worker"] = setupMode(defaults, langaugeName, isTypescript ? tokenization_1.Language.TypeScript : tokenization_1.Language.EcmaScript5);
+    function setupNamedLanguage(`languageName`, isTypescript, defaults) {
+        scriptWorkerMap[languageName + "Worker"] = setupMode(defaults, languageName, isTypescript ? tokenization_1.Language.TypeScript : tokenization_1.Language.EcmaScript5);
     }
     exports.setupNamedLanguage = setupNamedLanguage;
     function getNamedLanguageWorker(languageName) {
