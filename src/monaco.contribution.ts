@@ -17,7 +17,7 @@ import IDisposable = monaco.IDisposable;
 export class LanguageServiceDefaultsImpl implements monaco.languages.typescript.LanguageServiceDefaults {
 
 	private _onDidChange = new Emitter<monaco.languages.typescript.LanguageServiceDefaults>();
-	private _extraLibs: { [path: string]: string };
+	private _extraLibs: { [path: string]: { content: string, version: number } };
 	private _workerMaxIdleTime: number;
 	private _eagerModelSync: boolean;
 	private _compilerOptions: monaco.languages.typescript.CompilerOptions;
@@ -51,10 +51,14 @@ export class LanguageServiceDefaultsImpl implements monaco.languages.typescript.
 		}
 
 		if (this._extraLibs[filePath]) {
-			throw new Error(`${filePath} already a extra lib`);
+			this._extraLibs[filePath].version++;
+			this._extraLibs[filePath].content = content;
+		} else {
+			this._extraLibs[filePath] = {
+				content: content,
+				version: 1
+			};
 		}
-
-		this._extraLibs[filePath] = content;
 		if (this._eagerExtraLibSync) {
 			this.syncExtraLibs();
 		}

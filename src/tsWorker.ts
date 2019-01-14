@@ -25,7 +25,7 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 	// --- model sync -----------------------
 
 	private _ctx: IWorkerContext;
-	private _extraLibs: { [fileName: string]: string } = Object.create(null);
+	private _extraLibs: { [path: string]: { content: string, version: number } } = Object.create(null);
 	private _languageService = ts.createLanguageService(this);
 	private _compilerOptions: ts.CompilerOptions;
 
@@ -60,9 +60,11 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 		let model = this._getModel(fileName);
 		if (model) {
 			return model.version.toString();
-		} else if (this.isDefaultLibFileName(fileName) || fileName in this._extraLibs) {
-			// extra lib and default lib are static
+		} else if (this.isDefaultLibFileName(fileName)) {
+			// default lib is static
 			return '1';
+		} else if(fileName in this._extraLibs) {
+			return this._extraLibs[fileName].version.toString();
 		}
 	}
 
@@ -75,7 +77,7 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 
 		} else if (fileName in this._extraLibs) {
 			// static extra lib
-			text = this._extraLibs[fileName];
+			text = this._extraLibs[fileName].content;
 
 		} else if (fileName === DEFAULT_LIB.NAME) {
 			text = DEFAULT_LIB.CONTENTS;
@@ -198,7 +200,7 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 		return Promise.as(this._languageService.getEmitOutput(fileName));
 	}
 
-	syncExtraLibs(extraLibs: { [path: string]: string }) {
+	syncExtraLibs(extraLibs: { [path: string]: { content: string, version: number } }) {
 		this._extraLibs = extraLibs;
 	}
 
@@ -236,7 +238,7 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 
 export interface ICreateData {
 	compilerOptions: ts.CompilerOptions;
-	extraLibs: { [path: string]: string };
+	extraLibs: { [path: string]: { content: string, version: number } };
 }
 
 export function create(ctx: IWorkerContext, createData: ICreateData): TypeScriptWorker {
