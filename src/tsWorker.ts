@@ -206,6 +206,7 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 
 	getPropertiesOrAttributesOf(fileName: string, parentObjects: string[]) {
 		let currentFile = this._languageService.getProgram().getSourceFile(fileName);
+		let typeChecker = this._languageService.getProgram().getTypeChecker();
 		let referencedEntities = {};
 		parentObjects.forEach(function (key) { referencedEntities[key] = {}; });
 		ts.forEachChild(currentFile, function visitNodes(node: ts.Node) {
@@ -223,7 +224,11 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 					}
 				}
 				if (node.argumentExpression.kind == ts.SyntaxKind.PropertyAccessExpression) {
-					// TODO: matches Things[me.property]
+					// matches Things[me.property]
+					let type = typeChecker.getTypeAtLocation(node.argumentExpression);
+					if(type["value"]) {
+						referencedEntities[node.expression.getText()][type["value"]] = true;
+					}
 				} else if (ts.isStringLiteral(node.argumentExpression)) {
 					// matches Things["test"]
 					referencedEntities[node.expression.getText()][node.argumentExpression.getText().slice(1, -1)] = true;
