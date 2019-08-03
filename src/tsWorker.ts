@@ -200,6 +200,10 @@ export class TypeScriptWorker implements ts.LanguageServiceHost {
 		return Promise.resolve(this._languageService.getEmitOutput(fileName));
 	}
 
+	getProgram(): Promise<ts.Program | undefined> {
+		return Promise.resolve(this._languageService.getProgram() );
+	}
+
 	updateExtraLibs(extraLibs: IExtraLibs) {
 		this._extraLibs = extraLibs;
 	}
