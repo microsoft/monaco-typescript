@@ -380,6 +380,18 @@ declare module monaco.languages.typescript {
          * @returns `Promise<ReadonlyArray<typescript.CodeFixAction>>`
          */
         getCodeFixesAtPosition(fileName: string, start: number, end: number, errorCodes: number[], formatOptions: any): Promise<ReadonlyArray<any>>;
+
+        /**
+         * Get the program.
+         * @returns `Promise<typescript.Program>`
+         */
+        getProgram(): Promise<any>;
+
+        /**
+         * Get the source file.
+         * Note: monaco.languages.typescript namespace doesn't have exported member Program nor SourceFile. This may cause issues.
+         */
+        getSourceFile2(fileName: string): Promise<any>;
     }
 
     export const typescriptVersion: string;

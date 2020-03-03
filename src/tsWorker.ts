@@ -230,6 +230,14 @@ export class TypeScriptWorker implements ts.LanguageServiceHost, monaco.language
 		return Promise.resolve(this._languageService.getCodeFixesAtPosition(fileName, start, end, errorCodes, formatOptions, preferences));
 	}
 
+	getProgram(): Promise<ts.Program | undefined> {
+		return Promise.resolve(this._languageService.getProgram());
+	}
+
+	getSourceFile2(fileName: string): Promise<ts.SourceFile | undefined> {
+		return Promise.resolve(this._languageService.getProgram()!.getSourceFile(fileName));
+	}
+
 	updateExtraLibs(extraLibs: IExtraLibs) {
 		this._extraLibs = extraLibs;
 	}
