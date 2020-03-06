@@ -191,6 +191,10 @@ define(["require", "exports", "./lib/typescriptServices", "./lib/lib"], function
         TypeScriptWorker.prototype.getSourceFile2 = function (fileName) {
             return Promise.resolve(this._languageService.getProgram().getSourceFile(fileName));
         };
+        TypeScriptWorker.prototype.updateSourceFileText = function (fileName, newText, textChangeRange) {
+            var _a;
+            return Promise.resolve((_a = this._languageService.getProgram().getSourceFile(fileName)) === null || _a === void 0 ? void 0 : _a.update(newText, textChangeRange).getFullText());
+        };
         TypeScriptWorker.prototype.updateExtraLibs = function (extraLibs) {
             this._extraLibs = extraLibs;
         };
