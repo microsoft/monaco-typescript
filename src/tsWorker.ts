@@ -242,6 +242,11 @@ export class TypeScriptWorker implements ts.LanguageServiceHost, monaco.language
 		return Promise.resolve(this._languageService.getProgram()!.getSourceFile(fileName)?.update(newText, textChangeRange).getFullText());
 	}
 
+	modifyFile(fileName: string): any {
+		// this._languageService.getProgram()!.getSourceFile(fileName).
+		return Promise.resolve(this._languageService.getProgram()!.getSourceFile(fileName)?.modifyFile());
+	}
+
 	updateExtraLibs(extraLibs: IExtraLibs) {
 		this._extraLibs = extraLibs;
 	}

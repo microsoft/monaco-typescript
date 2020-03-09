@@ -394,6 +394,8 @@ declare module monaco.languages.typescript {
         getSourceFile2(fileName: string): Promise<any>;
 
         updateSourceFileText(fileName: string, newText: string, textChangeRange: any ): any;
+
+        modifyFile(fileName: string): Promise<any>;
     }
 
     export const typescriptVersion: string;
