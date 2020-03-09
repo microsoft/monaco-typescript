@@ -19,14 +19,14 @@ var LanguageServiceDefaultsImpl = /** @class */ (function () {
         get: function () {
             return this._onDidChange.event;
         },
-        enumerable: true,
+        enumerable: false,
         configurable: true
     });
     Object.defineProperty(LanguageServiceDefaultsImpl.prototype, "onDidExtraLibsChange", {
         get: function () {
             return this._onDidExtraLibsChange.event;
         },
-        enumerable: true,
+        enumerable: false,
         configurable: true
     });
     LanguageServiceDefaultsImpl.prototype.getExtraLibs = function () {

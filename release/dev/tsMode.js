@@ -5,6 +5,7 @@ define(["require", "exports", "./workerManager", "./languageFeatures"], function
      *--------------------------------------------------------------------------------------------*/
     'use strict';
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.getTypeScriptWorker = exports.getJavaScriptWorker = exports.setupJavaScript = exports.setupTypeScript = void 0;
     var javaScriptWorker;
     var typeScriptWorker;
     function setupTypeScript(defaults) {

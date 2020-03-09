@@ -5,6 +5,7 @@ define(["require", "exports", "./lib/typescriptServices", "./lib/lib"], function
      *--------------------------------------------------------------------------------------------*/
     'use strict';
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.create = exports.TypeScriptWorker = void 0;
     var DEFAULT_ES5_LIB = {
         NAME: 'defaultLib:lib.d.ts',
         CONTENTS: lib_1.lib_es5_dts

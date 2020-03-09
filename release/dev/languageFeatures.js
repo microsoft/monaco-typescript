@@ -54,6 +54,7 @@ define(["require", "exports"], function (require, exports) {
      *--------------------------------------------------------------------------------------------*/
     'use strict';
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.RenameAdapter = exports.CodeActionAdaptor = exports.FormatOnTypeAdapter = exports.FormatAdapter = exports.FormatHelper = exports.Kind = exports.OutlineAdapter = exports.ReferenceAdapter = exports.DefinitionAdapter = exports.OccurrencesAdapter = exports.QuickInfoAdapter = exports.SignatureHelpAdapter = exports.SuggestAdapter = exports.DiagnosticsAdapter = exports.Adapter = exports.flattenDiagnosticMessageText = void 0;
     var Uri = monaco.Uri;
     var Range = monaco.Range;
     //#region utils copied from typescript to prevent loading the entire typescriptServices ---
@@ -296,7 +297,7 @@ define(["require", "exports"], function (require, exports) {
             get: function () {
                 return ['.'];
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         SuggestAdapter.prototype.provideCompletionItems = function (model, position, _context, token) {
@@ -816,7 +817,7 @@ define(["require", "exports"], function (require, exports) {
             get: function () {
                 return [';', '}', '\n'];
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
         FormatOnTypeAdapter.prototype.provideOnTypeFormattingEdits = function (model, position, ch, options, token) {

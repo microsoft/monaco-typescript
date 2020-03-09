@@ -41,6 +41,7 @@ define(["require", "exports"], function (require, exports) {
      *--------------------------------------------------------------------------------------------*/
     'use strict';
     Object.defineProperty(exports, "__esModule", { value: true });
+    exports.WorkerManager = void 0;
     var WorkerManager = /** @class */ (function () {
         function WorkerManager(modeId, defaults) {
             var _this = this;
