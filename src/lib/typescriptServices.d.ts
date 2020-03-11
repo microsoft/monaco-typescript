@@ -5057,7 +5057,7 @@ declare namespace ts {
         getLineStarts(): readonly number[];
         getPositionOfLineAndCharacter(line: number, character: number): number;
         update(newText: string, textChangeRange: TextChangeRange): SourceFile;
-        getUpdatedCode(start: number, end: number, newValue: number, paramIndex?: number): string;
+        getUpdatedCode(lineNumber: number, startColumn: number, endColumn: number, newValue: number, paramIndex?: number): string;
     }
     interface SourceFileLike {
         getLineAndCharacterOfPosition(pos: number): LineAndCharacter;

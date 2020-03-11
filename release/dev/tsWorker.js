@@ -196,9 +196,9 @@ define(["require", "exports", "./lib/typescriptServices", "./lib/lib"], function
             var _a;
             return Promise.resolve((_a = this._languageService.getProgram().getSourceFile(fileName)) === null || _a === void 0 ? void 0 : _a.update(newText, textChangeRange).getFullText());
         };
-        TypeScriptWorker.prototype.getUpdatedCode = function (fileName, start, end, newValue, paramIndex) {
+        TypeScriptWorker.prototype.getUpdatedCode = function (fileName, lineNumber, startColumn, endColumn, newValue, paramIndex) {
             var _a;
-            return Promise.resolve((_a = this._languageService.getProgram().getSourceFile(fileName)) === null || _a === void 0 ? void 0 : _a.getUpdatedCode(start, end, newValue, paramIndex));
+            return Promise.resolve((_a = this._languageService.getProgram().getSourceFile(fileName)) === null || _a === void 0 ? void 0 : _a.getUpdatedCode(lineNumber, startColumn, endColumn, newValue, paramIndex));
         };
         TypeScriptWorker.prototype.updateExtraLibs = function (extraLibs) {
             this._extraLibs = extraLibs;
