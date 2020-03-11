@@ -4995,7 +4995,6 @@ declare namespace ts {
         getWidth(sourceFile?: SourceFileLike): number;
         getFullWidth(): number;
         getLeadingTriviaWidth(sourceFile?: SourceFile): number;
-        modifyFile(sourceFile?: SourceFile): string;
         getFullText(sourceFile?: SourceFile): string;
         getText(sourceFile?: SourceFile): string;
         getFirstToken(sourceFile?: SourceFile): Node | undefined;
@@ -5058,6 +5057,7 @@ declare namespace ts {
         getLineStarts(): readonly number[];
         getPositionOfLineAndCharacter(line: number, character: number): number;
         update(newText: string, textChangeRange: TextChangeRange): SourceFile;
+        getUpdatedCode(start: number, end: number, newValue: number, paramIndex?: number): string;
     }
     interface SourceFileLike {
         getLineAndCharacterOfPosition(pos: number): LineAndCharacter;
