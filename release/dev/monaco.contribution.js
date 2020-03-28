@@ -5,7 +5,6 @@ define(["require", "exports", "./lib/typescriptServicesMetadata"], function (req
      *--------------------------------------------------------------------------------------------*/
     'use strict';
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.LanguageServiceDefaultsImpl = void 0;
     var Emitter = monaco.Emitter;
     var LanguageServiceDefaultsImpl = /** @class */ (function () {
         function LanguageServiceDefaultsImpl(compilerOptions, diagnosticsOptions) {
@@ -21,14 +20,14 @@ define(["require", "exports", "./lib/typescriptServicesMetadata"], function (req
             get: function () {
                 return this._onDidChange.event;
             },
-            enumerable: false,
+            enumerable: true,
             configurable: true
         });
         Object.defineProperty(LanguageServiceDefaultsImpl.prototype, "onDidExtraLibsChange", {
             get: function () {
                 return this._onDidExtraLibsChange.event;
             },
-            enumerable: false,
+            enumerable: true,
             configurable: true
         });
         LanguageServiceDefaultsImpl.prototype.getExtraLibs = function () {

@@ -382,19 +382,17 @@ declare module monaco.languages.typescript {
         getCodeFixesAtPosition(fileName: string, start: number, end: number, errorCodes: number[], formatOptions: any): Promise<ReadonlyArray<any>>;
 
         /**
-         * Get the program.
-         * @returns `Promise<typescript.Program>`
+         * Takes in a target source file name, line number, and start/end column to return the updated editor content using the new value.
+         * The line number & start/end column supports a VariableDeclaration node or CallExpression node.
+         *
+         * @param fileName Source file name
+         * @param lineNumber Line number of target node
+         * @param startColumn Start column of target node
+         * @param endColumn End column of target node
+         * @param newValue New target numeric value of target node,
+         * @param paramIndex Optional parameter index.
+         * @returns `Promise<string>`
          */
-        getProgram(): Promise<any>;
-
-        /**
-         * Get the source file.
-         * Note: monaco.languages.typescript namespace doesn't have exported member Program nor SourceFile. This may cause issues.
-         */
-        getSourceFile2(fileName: string): Promise<any>;
-
-        updateSourceFileText(fileName: string, newText: string, textChangeRange: any ): any;
-
         getUpdatedCode(fileName: string, lineNumber: number, startColumn: number, endColumn: number, newValue: number, paramIndex?: number): Promise<any>;
     }
 

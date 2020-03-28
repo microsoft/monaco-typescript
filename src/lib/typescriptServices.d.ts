@@ -2,22 +2,22 @@
 // **NOTE**: Do not edit directly! This file is generated using `npm run import-typescript`
 //
 /*! *****************************************************************************
-Copyright (c) Microsoft Corporation. All rights reserved.
+Copyright (c) Microsoft Corporation. All rights reserved. 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License. You may obtain a copy of the
-License at http://www.apache.org/licenses/LICENSE-2.0
-
+License at http://www.apache.org/licenses/LICENSE-2.0  
+ 
 THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
-WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
-MERCHANTABLITY OR NON-INFRINGEMENT.
-
+WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE, 
+MERCHANTABLITY OR NON-INFRINGEMENT. 
+ 
 See the Apache Version 2.0 License for specific language governing permissions
 and limitations under the License.
 ***************************************************************************** */
 
 declare namespace ts {
-    const versionMajorMinor = "3.9";
+    const versionMajorMinor = "3.8";
     /** The version of the TypeScript compiler release */
     const version: string;
     /**
@@ -386,30 +386,29 @@ declare namespace ts {
         JSDocSignature = 305,
         JSDocTag = 306,
         JSDocAugmentsTag = 307,
-        JSDocImplementsTag = 308,
-        JSDocAuthorTag = 309,
-        JSDocClassTag = 310,
-        JSDocPublicTag = 311,
-        JSDocPrivateTag = 312,
-        JSDocProtectedTag = 313,
-        JSDocReadonlyTag = 314,
-        JSDocCallbackTag = 315,
-        JSDocEnumTag = 316,
-        JSDocParameterTag = 317,
-        JSDocReturnTag = 318,
-        JSDocThisTag = 319,
-        JSDocTypeTag = 320,
-        JSDocTemplateTag = 321,
-        JSDocTypedefTag = 322,
-        JSDocPropertyTag = 323,
-        SyntaxList = 324,
-        NotEmittedStatement = 325,
-        PartiallyEmittedExpression = 326,
-        CommaListExpression = 327,
-        MergeDeclarationMarker = 328,
-        EndOfDeclarationMarker = 329,
-        SyntheticReferenceExpression = 330,
-        Count = 331,
+        JSDocAuthorTag = 308,
+        JSDocClassTag = 309,
+        JSDocPublicTag = 310,
+        JSDocPrivateTag = 311,
+        JSDocProtectedTag = 312,
+        JSDocReadonlyTag = 313,
+        JSDocCallbackTag = 314,
+        JSDocEnumTag = 315,
+        JSDocParameterTag = 316,
+        JSDocReturnTag = 317,
+        JSDocThisTag = 318,
+        JSDocTypeTag = 319,
+        JSDocTemplateTag = 320,
+        JSDocTypedefTag = 321,
+        JSDocPropertyTag = 322,
+        SyntaxList = 323,
+        NotEmittedStatement = 324,
+        PartiallyEmittedExpression = 325,
+        CommaListExpression = 326,
+        MergeDeclarationMarker = 327,
+        EndOfDeclarationMarker = 328,
+        SyntheticReferenceExpression = 329,
+        Count = 330,
         FirstAssignment = 62,
         LastAssignment = 74,
         FirstCompoundAssignment = 63,
@@ -438,9 +437,9 @@ declare namespace ts {
         LastStatement = 241,
         FirstNode = 153,
         FirstJSDocNode = 294,
-        LastJSDocNode = 323,
+        LastJSDocNode = 322,
         FirstJSDocTagNode = 306,
-        LastJSDocTagNode = 323,
+        LastJSDocTagNode = 322,
     }
     export enum NodeFlags {
         None = 0,
@@ -1149,7 +1148,7 @@ declare namespace ts {
     }
     export interface ExpressionWithTypeArguments extends NodeWithTypeArguments {
         kind: SyntaxKind.ExpressionWithTypeArguments;
-        parent: HeritageClause | JSDocAugmentsTag | JSDocImplementsTag;
+        parent: HeritageClause | JSDocAugmentsTag;
         expression: LeftHandSideExpression;
     }
     export interface NewExpression extends PrimaryExpression, Declaration {
@@ -1639,12 +1638,6 @@ declare namespace ts {
             expression: Identifier | PropertyAccessEntityNameExpression;
         };
     }
-    export interface JSDocImplementsTag extends JSDocTag {
-        kind: SyntaxKind.JSDocImplementsTag;
-        class: ExpressionWithTypeArguments & {
-            expression: Identifier | PropertyAccessEntityNameExpression;
-        };
-    }
     export interface JSDocAuthorTag extends JSDocTag {
         kind: SyntaxKind.JSDocAuthorTag;
     }
@@ -1736,9 +1729,10 @@ declare namespace ts {
         SwitchClause = 128,
         ArrayMutation = 256,
         Call = 512,
-        ReduceLabel = 1024,
-        Referenced = 2048,
-        Shared = 4096,
+        Referenced = 1024,
+        Shared = 2048,
+        PreFinally = 4096,
+        AfterFinally = 8192,
         Label = 12,
         Condition = 96
     }
@@ -1783,11 +1777,6 @@ declare namespace ts {
     }
     export interface FlowArrayMutation extends FlowNodeBase {
         node: CallExpression | BinaryExpression;
-        antecedent: FlowNode;
-    }
-    export interface FlowReduceLabel extends FlowNodeBase {
-        target: FlowLabel;
-        antecedents: FlowNode[];
         antecedent: FlowNode;
     }
     export type FlowType = Type | IncompleteType;
@@ -1927,8 +1916,7 @@ declare namespace ts {
         /** @throws OperationCanceledException if isCancellationRequested is true */
         throwIfCancellationRequested(): void;
     }
-    export interface Program extends ScriptReferenceHost, ModuleSpecifierResolutionHost {
-        getCurrentDirectory(): string;
+    export interface Program extends ScriptReferenceHost {
         /**
          * Get a list of root file names that were passed to a 'createProgram'
          */
@@ -1963,7 +1951,6 @@ declare namespace ts {
         getIdentifierCount(): number;
         getSymbolCount(): number;
         getTypeCount(): number;
-        getInstantiationCount(): number;
         getRelationCacheSizes(): {
             assignable: number;
             identity: number;
@@ -2988,7 +2975,6 @@ declare namespace ts {
         readonly scoped: boolean;
         readonly text: string | ((node: EmitHelperUniqueNameCallback) => string);
         readonly priority?: number;
-        readonly dependencies?: EmitHelper[];
     }
     export interface UnscopedEmitHelper extends EmitHelper {
         readonly scoped: false;
@@ -3276,7 +3262,7 @@ declare namespace ts {
         readonly includeCompletionsWithInsertText?: boolean;
         readonly importModuleSpecifierPreference?: "auto" | "relative" | "non-relative";
         /** Determines whether we import `foo/index.ts` as "foo", "foo/index", or "foo/index.js" */
-        readonly importModuleSpecifierEnding?: "auto" | "minimal" | "index" | "js";
+        readonly importModuleSpecifierEnding?: "minimal" | "index" | "js";
         readonly allowTextChangesInNewFiles?: boolean;
         readonly providePrefixAndSuffixTextForRename?: boolean;
     }
@@ -3362,8 +3348,7 @@ declare namespace ts {
         isUnterminated(): boolean;
         reScanGreaterToken(): SyntaxKind;
         reScanSlashToken(): SyntaxKind;
-        reScanTemplateToken(isTaggedTemplate: boolean): SyntaxKind;
-        reScanTemplateHeadOrNoSubstitutionTemplate(): SyntaxKind;
+        reScanTemplateToken(): SyntaxKind;
         scanJsxIdentifier(): SyntaxKind;
         scanJsxAttributeValue(): SyntaxKind;
         reScanJsxAttributeValue(): SyntaxKind;
@@ -3527,8 +3512,6 @@ declare namespace ts {
     function hasJSDocParameterTags(node: FunctionLikeDeclaration | SignatureDeclaration): boolean;
     /** Gets the JSDoc augments tag for the node if present */
     function getJSDocAugmentsTag(node: Node): JSDocAugmentsTag | undefined;
-    /** Gets the JSDoc implements tags for the node if present */
-    function getJSDocImplementsTags(node: Node): readonly JSDocImplementsTag[];
     /** Gets the JSDoc class tag for the node if present */
     function getJSDocClassTag(node: Node): JSDocClassTag | undefined;
     /** Gets the JSDoc public tag for the node if present */
@@ -3570,9 +3553,7 @@ declare namespace ts {
     function getJSDocReturnType(node: Node): TypeNode | undefined;
     /** Get all JSDoc tags related to a node, including those on parent nodes. */
     function getJSDocTags(node: Node): readonly JSDocTag[];
-    /** Gets all JSDoc tags that match a specified predicate */
-    function getAllJSDocTags<T extends JSDocTag>(node: Node, predicate: (tag: JSDocTag) => tag is T): readonly T[];
-    /** Gets all JSDoc tags of a specified kind */
+    /** Gets all JSDoc tags of a specified kind, or undefined if not present. */
     function getAllJSDocTagsOfKind(node: Node, kind: SyntaxKind): readonly JSDocTag[];
     /**
      * Gets the effective type parameters. If the node was parsed in a
@@ -3748,7 +3729,6 @@ declare namespace ts {
     function isJSDoc(node: Node): node is JSDoc;
     function isJSDocAuthorTag(node: Node): node is JSDocAuthorTag;
     function isJSDocAugmentsTag(node: Node): node is JSDocAugmentsTag;
-    function isJSDocImplementsTag(node: Node): node is JSDocImplementsTag;
     function isJSDocClassTag(node: Node): node is JSDocClassTag;
     function isJSDocPublicTag(node: Node): node is JSDocPublicTag;
     function isJSDocPrivateTag(node: Node): node is JSDocPrivateTag;
@@ -3810,8 +3790,6 @@ declare namespace ts {
     function isJSDocCommentContainingNode(node: Node): boolean;
     function isSetAccessor(node: Node): node is SetAccessorDeclaration;
     function isGetAccessor(node: Node): node is GetAccessorDeclaration;
-    /** True if has initializer node attached to it. */
-    function hasOnlyExpressionInitializer(node: Node): node is HasExpressionInitializer;
     function isObjectLiteralElement(node: Node): node is ObjectLiteralElement;
     function isStringLiteralLike(node: Node): node is StringLiteralLike;
 }
@@ -5057,7 +5035,6 @@ declare namespace ts {
         getLineStarts(): readonly number[];
         getPositionOfLineAndCharacter(line: number, character: number): number;
         update(newText: string, textChangeRange: TextChangeRange): SourceFile;
-        getUpdatedCode(lineNumber: number, startColumn: number, endColumn: number, newValue: number, paramIndex?: number): string;
     }
     interface SourceFileLike {
         getLineAndCharacterOfPosition(pos: number): LineAndCharacter;

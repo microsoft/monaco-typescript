@@ -293,7 +293,7 @@ var SuggestAdapter = /** @class */ (function (_super) {
         get: function () {
             return ['.'];
         },
-        enumerable: false,
+        enumerable: true,
         configurable: true
     });
     SuggestAdapter.prototype.provideCompletionItems = function (model, position, _context, token) {
@@ -813,7 +813,7 @@ var FormatOnTypeAdapter = /** @class */ (function (_super) {
         get: function () {
             return [';', '}', '\n'];
         },
-        enumerable: false,
+        enumerable: true,
         configurable: true
     });
     FormatOnTypeAdapter.prototype.provideOnTypeFormattingEdits = function (model, position, ch, options, token) {

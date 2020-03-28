@@ -5,7 +5,6 @@ define(["require", "exports", "./lib/typescriptServices", "./lib/lib"], function
      *--------------------------------------------------------------------------------------------*/
     'use strict';
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.create = exports.TypeScriptWorker = void 0;
     var DEFAULT_ES5_LIB = {
         NAME: 'defaultLib:lib.d.ts',
         CONTENTS: lib_1.lib_es5_dts
@@ -186,22 +185,52 @@ define(["require", "exports", "./lib/typescriptServices", "./lib/lib"], function
             var preferences = {};
             return Promise.resolve(this._languageService.getCodeFixesAtPosition(fileName, start, end, errorCodes, formatOptions, preferences));
         };
-        TypeScriptWorker.prototype.getProgram = function () {
-            return Promise.resolve(this._languageService.getProgram());
-        };
-        TypeScriptWorker.prototype.getSourceFile2 = function (fileName) {
-            return Promise.resolve(this._languageService.getProgram().getSourceFile(fileName));
-        };
-        TypeScriptWorker.prototype.updateSourceFileText = function (fileName, newText, textChangeRange) {
-            var _a;
-            return Promise.resolve((_a = this._languageService.getProgram().getSourceFile(fileName)) === null || _a === void 0 ? void 0 : _a.update(newText, textChangeRange).getFullText());
-        };
-        TypeScriptWorker.prototype.getUpdatedCode = function (fileName, lineNumber, startColumn, endColumn, newValue, paramIndex) {
-            var _a;
-            return Promise.resolve((_a = this._languageService.getProgram().getSourceFile(fileName)) === null || _a === void 0 ? void 0 : _a.getUpdatedCode(lineNumber, startColumn, endColumn, newValue, paramIndex));
-        };
         TypeScriptWorker.prototype.updateExtraLibs = function (extraLibs) {
             this._extraLibs = extraLibs;
+        };
+        // Console UI Additions:
+        TypeScriptWorker.prototype.generatedUpdatedCode = function (fileName, lineNumber, startColumn, endColumn, newValue, paramIndex) {
+            var sourceFile = this._languageService.getProgram().getSourceFile(fileName);
+            var printer = ts.createPrinter({
+                newLine: ts.NewLineKind.LineFeed,
+                removeComments: false,
+                omitTrailingSemicolon: true
+            });
+            var transformer = (function (context) {
+                return function (rootNode) {
+                    function visit(node) {
+                        node = ts.visitEachChild(node, visit, context);
+                        if (ts.isVariableDeclaration(node)) {
+                            var startAndLine = sourceFile.getLineAndCharacterOfPosition(node.name.getStart(sourceFile));
+                            var endAndLine = sourceFile.getLineAndCharacterOfPosition(node.name.getEnd());
+                            if (startAndLine.character === startColumn && endAndLine.character === endColumn && startAndLine.line === lineNumber) {
+                                var clone = ts.getMutableClone(node);
+                                clone.initializer = ts.createLiteral(newValue);
+                                return clone;
+                            }
+                        }
+                        else if (ts.isCallExpression(node)) {
+                            var startAndLine = sourceFile.getLineAndCharacterOfPosition(node.expression.getStart(sourceFile));
+                            var endAndLine = sourceFile.getLineAndCharacterOfPosition(node.expression.getEnd());
+                            if (startAndLine.character === startColumn && endAndLine.character === endColumn && startAndLine.line === lineNumber) {
+                                var clone = ts.getMutableClone(node);
+                                // @ts-ignore TODO Update arguments in another way.
+                                clone.arguments[paramIndex || 0] = ts.createLiteral(newValue);
+                                return clone;
+                            }
+                        }
+                        return node;
+                    }
+                    return ts.visitNode(rootNode, visit);
+                };
+            });
+            var transformResult = ts.transform(sourceFile, [transformer]);
+            var updatedSourceFile = transformResult.transformed[0];
+            // @ts-ignore TODO Figure out why updatedSourceFile is of type Node instead of SourceFileObject
+            return printer.printFile(updatedSourceFile);
+        };
+        TypeScriptWorker.prototype.getUpdatedCode = function (fileName, lineNumber, startColumn, endColumn, newValue, paramIndex) {
+            return Promise.resolve(this.generatedUpdatedCode(fileName, lineNumber, startColumn, endColumn, newValue, paramIndex));
         };
         return TypeScriptWorker;
     }());
