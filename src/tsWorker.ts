@@ -230,24 +230,62 @@ export class TypeScriptWorker implements ts.LanguageServiceHost, monaco.language
 		return Promise.resolve(this._languageService.getCodeFixesAtPosition(fileName, start, end, errorCodes, formatOptions, preferences));
 	}
 
-	getProgram(): Promise<ts.Program | undefined> {
-		return Promise.resolve(this._languageService.getProgram());
-	}
-
-	getSourceFile2(fileName: string): Promise<ts.SourceFile | undefined> {
-		return Promise.resolve(this._languageService.getProgram()!.getSourceFile(fileName));
-	}
-
-	updateSourceFileText(fileName: string, newText: string, textChangeRange: ts.TextChangeRange ): any {
-		return Promise.resolve(this._languageService.getProgram()!.getSourceFile(fileName)?.update(newText, textChangeRange).getFullText());
-	}
-
-	getUpdatedCode(fileName: string, lineNumber: number, startColumn: number, endColumn: number, newValue: number, paramIndex?: number): any {
-		return Promise.resolve(this._languageService.getProgram()!.getSourceFile(fileName)?.getUpdatedCode(lineNumber, startColumn, endColumn, newValue, paramIndex));
-	}
-
 	updateExtraLibs(extraLibs: IExtraLibs) {
 		this._extraLibs = extraLibs;
+	}
+
+	// Console UI Additions:
+
+	generatedUpdatedCode(fileName: string, lineNumber: number, startColumn: number, endColumn: number, newValue: number, paramIndex?: number): string {
+		let sourceFile = this._languageService.getProgram()!.getSourceFile(fileName);
+		let printer = ts.createPrinter({
+				newLine: ts.NewLineKind.LineFeed,
+				removeComments: false,
+				omitTrailingSemicolon: true
+		});
+
+		let transformer = ((context: ts.TransformationContext) => {
+			return (rootNode: ts.Node) => {
+				function visit(node: ts.Node) {
+					node = ts.visitEachChild(node, visit, context);
+						if (ts.isVariableDeclaration(node)) {
+								let startAndLine = sourceFile!.getLineAndCharacterOfPosition(node.name.getStart(sourceFile));
+								let endAndLine = sourceFile!.getLineAndCharacterOfPosition(node.name.getEnd());
+
+								if (startAndLine.character === startColumn && endAndLine.character === endColumn && startAndLine.line === lineNumber) {
+										let clone = ts.getMutableClone(node);
+										clone.initializer = ts.createLiteral(newValue);
+										return clone;
+								}
+						}
+						else if (ts.isCallExpression(node)) {
+								let startAndLine = sourceFile!.getLineAndCharacterOfPosition(node.expression.getStart(sourceFile));
+								let endAndLine = sourceFile!.getLineAndCharacterOfPosition(node.expression.getEnd());
+
+								if (startAndLine.character === startColumn && endAndLine.character === endColumn && startAndLine.line === lineNumber) {
+										let clone = ts.getMutableClone(node);
+
+										// @ts-ignore TODO Update arguments in another way.
+										clone.arguments[paramIndex || 0] = ts.createLiteral(newValue);
+
+										return clone;
+								}
+						}
+					return node;
+				}
+				return ts.visitNode(rootNode, visit);
+			};
+		});
+
+		let transformResult = ts.transform(sourceFile!, [transformer]);
+		let updatedSourceFile = transformResult.transformed[0];
+
+		// @ts-ignore TODO Figure out why updatedSourceFile is of type Node instead of SourceFileObject
+		return printer.printFile(updatedSourceFile);
+	}
+
+	getUpdatedCode(fileName: string, lineNumber: number, startColumn: number, endColumn: number, newValue: number, paramIndex?: number): Promise<string> {
+		return Promise.resolve(this.generatedUpdatedCode(fileName, lineNumber, startColumn, endColumn, newValue, paramIndex));
 	}
 }
 
