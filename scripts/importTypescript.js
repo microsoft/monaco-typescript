@@ -50,7 +50,9 @@ export const typescriptVersion = "${typeScriptDependencyVersion}";\n`
 	// \/[*/] matches the start of a comment (single or multi-line).
 	// ^\s+\*[^/] matches (presumably) a later line of a multi-line comment.
 	const tsServicesNoCommentedRequire = tsServices.replace(/(\/[*/]|^\s+\*[^/]).*\brequire\(.*/gm, '');
-	const linesWithRequire = tsServicesNoCommentedRequire.match(/^.*?\brequire\(.*$/gm);
+	const linesWithRequire = tsServicesNoCommentedRequire.match(/^.*?\brequire\(.*$/gm)
+	  .filter(l => !l.includes(": diag(")) // Allow error messages to include references to require() in their strings
+
 	if (linesWithRequire && linesWithRequire.length) {
 		console.error('Found new require() calls on the following lines. These should be removed to avoid breaking webpack builds.\n');
 		console.error(linesWithRequire.join('\n'));
