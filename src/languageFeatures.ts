@@ -4,15 +4,22 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
-import { LanguageServiceDefaultsImpl } from './monaco.contribution';
-import * as ts from './lib/typescriptServices';
-import { TypeScriptWorker } from './tsWorker';
-
-import Uri = monaco.Uri;
-import Position = monaco.Position;
-import Range = monaco.Range;
-import CancellationToken = monaco.CancellationToken;
-import IDisposable = monaco.IDisposable;
+import { LanguageServiceDefaults } from './monaco.contribution';
+import type * as ts from './lib/typescriptServices';
+import type { TypeScriptWorker } from './tsWorker';
+import { libFileSet } from './lib/lib.index';
+import {
+	editor,
+	languages,
+	Uri,
+	Position,
+	Range,
+	CancellationToken,
+	IDisposable,
+	IRange,
+	MarkerTag,
+	MarkerSeverity
+} from './fillers/monaco-editor-core';
 
 //#region utils copied from typescript to prevent loading the entire typescriptServices ---
 
@@ -22,19 +29,22 @@ enum IndentStyle {
 	Smart = 2
 }
 
-export function flattenDiagnosticMessageText(diag: string | ts.DiagnosticMessageChain | undefined, newLine: string, indent = 0): string {
-	if (typeof diag === "string") {
+export function flattenDiagnosticMessageText(
+	diag: string | ts.DiagnosticMessageChain | undefined,
+	newLine: string,
+	indent = 0
+): string {
+	if (typeof diag === 'string') {
 		return diag;
+	} else if (diag === undefined) {
+		return '';
 	}
-	else if (diag === undefined) {
-		return "";
-	}
-	let result = "";
+	let result = '';
 	if (indent) {
 		result += newLine;
 
 		for (let i = 0; i < indent; i++) {
-			result += "  ";
+			result += '  ';
 		}
 	}
 	result += diag.messageText;
@@ -49,32 +59,94 @@ export function flattenDiagnosticMessageText(diag: string | ts.DiagnosticMessage
 
 function displayPartsToString(displayParts: ts.SymbolDisplayPart[] | undefined): string {
 	if (displayParts) {
-		return displayParts.map((displayPart) => displayPart.text).join("");
+		return displayParts.map((displayPart) => displayPart.text).join('');
 	}
-	return "";
+	return '';
 }
 
 //#endregion
 
 export abstract class Adapter {
+	constructor(protected _worker: (...uris: Uri[]) => Promise<TypeScriptWorker>) {}
 
-	constructor(protected _worker: (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker>) {
-	}
-
-	// protected _positionToOffset(model: monaco.editor.ITextModel, position: monaco.IPosition): number {
+	// protected _positionToOffset(model: editor.ITextModel, position: monaco.IPosition): number {
 	// 	return model.getOffsetAt(position);
 	// }
 
-	// protected _offsetToPosition(model: monaco.editor.ITextModel, offset: number): monaco.IPosition {
+	// protected _offsetToPosition(model: editor.ITextModel, offset: number): monaco.IPosition {
 	// 	return model.getPositionAt(offset);
 	// }
 
-	protected _textSpanToRange(model: monaco.editor.ITextModel, span: ts.TextSpan): monaco.IRange {
+	protected _textSpanToRange(model: editor.ITextModel, span: ts.TextSpan): IRange {
 		let p1 = model.getPositionAt(span.start);
 		let p2 = model.getPositionAt(span.start + span.length);
 		let { lineNumber: startLineNumber, column: startColumn } = p1;
 		let { lineNumber: endLineNumber, column: endColumn } = p2;
 		return { startLineNumber, startColumn, endLineNumber, endColumn };
+	}
+}
+
+// --- lib files
+
+export class LibFiles {
+	private _libFiles: Record<string, string>;
+	private _hasFetchedLibFiles: boolean;
+	private _fetchLibFilesPromise: Promise<void> | null;
+
+	constructor(private readonly _worker: (...uris: Uri[]) => Promise<TypeScriptWorker>) {
+		this._libFiles = {};
+		this._hasFetchedLibFiles = false;
+		this._fetchLibFilesPromise = null;
+	}
+
+	public isLibFile(uri: Uri | null): boolean {
+		if (!uri) {
+			return false;
+		}
+		if (uri.path.indexOf('/lib.') === 0) {
+			return !!libFileSet[uri.path.slice(1)];
+		}
+		return false;
+	}
+
+	public getOrCreateModel(uri: Uri): editor.ITextModel | null {
+		const model = editor.getModel(uri);
+		if (model) {
+			return model;
+		}
+		if (this.isLibFile(uri) && this._hasFetchedLibFiles) {
+			return editor.createModel(this._libFiles[uri.path.slice(1)], 'javascript', uri);
+		}
+		return null;
+	}
+
+	private _containsLibFile(uris: (Uri | null)[]): boolean {
+		for (let uri of uris) {
+			if (this.isLibFile(uri)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public async fetchLibFilesIfNecessary(uris: (Uri | null)[]): Promise<void> {
+		if (!this._containsLibFile(uris)) {
+			// no lib files necessary
+			return;
+		}
+		await this._fetchLibFiles();
+	}
+
+	private _fetchLibFiles(): Promise<void> {
+		if (!this._fetchLibFilesPromise) {
+			this._fetchLibFilesPromise = this._worker()
+				.then((w) => w.getLibFiles())
+				.then((libFiles) => {
+					this._hasFetchedLibFiles = true;
+					this._libFiles = libFiles;
+				});
+		}
+		return this._fetchLibFilesPromise;
 	}
 }
 
@@ -88,16 +160,18 @@ enum DiagnosticCategory {
 }
 
 export class DiagnosticsAdapter extends Adapter {
-
 	private _disposables: IDisposable[] = [];
 	private _listener: { [uri: string]: IDisposable } = Object.create(null);
 
-	constructor(private _defaults: LanguageServiceDefaultsImpl, private _selector: string,
-		worker: (first: Uri, ...more: Uri[]) => Promise<TypeScriptWorker>
+	constructor(
+		private readonly _libFiles: LibFiles,
+		private _defaults: LanguageServiceDefaults,
+		private _selector: string,
+		worker: (...uris: Uri[]) => Promise<TypeScriptWorker>
 	) {
 		super(worker);
 
-		const onModelAdd = (model: monaco.editor.IModel): void => {
+		const onModelAdd = (model: editor.IModel): void => {
 			if (model.getModeId() !== _selector) {
 				return;
 			}
@@ -118,8 +192,8 @@ export class DiagnosticsAdapter extends Adapter {
 			this._doValidate(model);
 		};
 
-		const onModelRemoved = (model: monaco.editor.IModel): void => {
-			monaco.editor.setModelMarkers(model, this._selector, []);
+		const onModelRemoved = (model: editor.IModel): void => {
+			editor.setModelMarkers(model, this._selector, []);
 			const key = model.uri.toString();
 			if (this._listener[key]) {
 				this._listener[key].dispose();
@@ -127,16 +201,18 @@ export class DiagnosticsAdapter extends Adapter {
 			}
 		};
 
-		this._disposables.push(monaco.editor.onDidCreateModel(onModelAdd));
-		this._disposables.push(monaco.editor.onWillDisposeModel(onModelRemoved));
-		this._disposables.push(monaco.editor.onDidChangeModelLanguage(event => {
-			onModelRemoved(event.model);
-			onModelAdd(event.model);
-		}));
+		this._disposables.push(editor.onDidCreateModel(onModelAdd));
+		this._disposables.push(editor.onWillDisposeModel(onModelRemoved));
+		this._disposables.push(
+			editor.onDidChangeModelLanguage((event) => {
+				onModelRemoved(event.model);
+				onModelAdd(event.model);
+			})
+		);
 
 		this._disposables.push({
 			dispose() {
-				for (const model of monaco.editor.getModels()) {
+				for (const model of editor.getModels()) {
 					onModelRemoved(model);
 				}
 			}
@@ -144,7 +220,7 @@ export class DiagnosticsAdapter extends Adapter {
 
 		const recomputeDiagostics = () => {
 			// redo diagnostics when options change
-			for (const model of monaco.editor.getModels()) {
+			for (const model of editor.getModels()) {
 				onModelRemoved(model);
 				onModelAdd(model);
 			}
@@ -152,15 +228,15 @@ export class DiagnosticsAdapter extends Adapter {
 		this._disposables.push(this._defaults.onDidChange(recomputeDiagostics));
 		this._disposables.push(this._defaults.onDidExtraLibsChange(recomputeDiagostics));
 
-		monaco.editor.getModels().forEach(onModelAdd);
+		editor.getModels().forEach(onModelAdd);
 	}
 
 	public dispose(): void {
-		this._disposables.forEach(d => d && d.dispose());
+		this._disposables.forEach((d) => d && d.dispose());
 		this._disposables = [];
 	}
 
-	private async _doValidate(model: monaco.editor.ITextModel): Promise<void> {
+	private async _doValidate(model: editor.ITextModel): Promise<void> {
 		const worker = await this._worker(model.uri);
 
 		if (model.isDisposed()) {
@@ -169,7 +245,11 @@ export class DiagnosticsAdapter extends Adapter {
 		}
 
 		const promises: Promise<ts.Diagnostic[]>[] = [];
-		const { noSyntaxValidation, noSemanticValidation, noSuggestionDiagnostics } = this._defaults.getDiagnosticsOptions();
+		const {
+			noSyntaxValidation,
+			noSemanticValidation,
+			noSuggestionDiagnostics
+		} = this._defaults.getDiagnosticsOptions();
 		if (!noSyntaxValidation) {
 			promises.push(worker.getSyntacticDiagnostics(model.uri.toString()));
 		}
@@ -180,26 +260,58 @@ export class DiagnosticsAdapter extends Adapter {
 			promises.push(worker.getSuggestionDiagnostics(model.uri.toString()));
 		}
 
-		const diagnostics = await Promise.all(promises);
+		const allDiagnostics = await Promise.all(promises);
 
-		if (!diagnostics || model.isDisposed()) {
+		if (!allDiagnostics || model.isDisposed()) {
 			// model was disposed in the meantime
 			return;
 		}
 
-		const markers = diagnostics
+		const diagnostics = allDiagnostics
 			.reduce((p, c) => c.concat(p), [])
-			.filter(d => (this._defaults.getDiagnosticsOptions().diagnosticCodesToIgnore || []).indexOf(d.code) === -1)
-			.map(d => this._convertDiagnostics(model, d));
+			.filter(
+				(d) =>
+					(this._defaults.getDiagnosticsOptions().diagnosticCodesToIgnore || []).indexOf(d.code) ===
+					-1
+			);
 
-		monaco.editor.setModelMarkers(model, this._selector, markers);
+		// Fetch lib files if necessary
+		const relatedUris = diagnostics
+			.map((d) => d.relatedInformation || [])
+			.reduce((p, c) => c.concat(p), [])
+			.map((relatedInformation) =>
+				relatedInformation.file ? Uri.parse(relatedInformation.file.fileName) : null
+			);
+
+		await this._libFiles.fetchLibFilesIfNecessary(relatedUris);
+
+		if (model.isDisposed()) {
+			// model was disposed in the meantime
+			return;
+		}
+
+		editor.setModelMarkers(
+			model,
+			this._selector,
+			diagnostics.map((d) => this._convertDiagnostics(model, d))
+		);
 	}
 
-	private _convertDiagnostics(model: monaco.editor.ITextModel, diag: ts.Diagnostic): monaco.editor.IMarkerData {
+	private _convertDiagnostics(model: editor.ITextModel, diag: ts.Diagnostic): editor.IMarkerData {
 		const diagStart = diag.start || 0;
 		const diagLength = diag.length || 1;
 		const { lineNumber: startLineNumber, column: startColumn } = model.getPositionAt(diagStart);
-		const { lineNumber: endLineNumber, column: endColumn } = model.getPositionAt(diagStart + diagLength);
+		const { lineNumber: endLineNumber, column: endColumn } = model.getPositionAt(
+			diagStart + diagLength
+		);
+
+		const tags: MarkerTag[] = [];
+		if (diag.reportsUnnecessary) {
+			tags.push(MarkerTag.Unnecessary);
+		}
+		if (diag.reportsDeprecated) {
+			tags.push(MarkerTag.Deprecated);
+		}
 
 		return {
 			severity: this._tsDiagnosticCategoryToMarkerSeverity(diag.category),
@@ -209,22 +321,25 @@ export class DiagnosticsAdapter extends Adapter {
 			endColumn,
 			message: flattenDiagnosticMessageText(diag.messageText, '\n'),
 			code: diag.code.toString(),
-			tags: diag.reportsUnnecessary ? [monaco.MarkerTag.Unnecessary] : [],
-			relatedInformation: this._convertRelatedInformation(model, diag.relatedInformation),
+			tags,
+			relatedInformation: this._convertRelatedInformation(model, diag.relatedInformation)
 		};
 	}
 
-	private _convertRelatedInformation(model: monaco.editor.ITextModel, relatedInformation?: ts.DiagnosticRelatedInformation[]): monaco.editor.IRelatedInformation[] | undefined {
+	private _convertRelatedInformation(
+		model: editor.ITextModel,
+		relatedInformation?: ts.DiagnosticRelatedInformation[]
+	): editor.IRelatedInformation[] | undefined {
 		if (!relatedInformation) {
 			return;
 		}
 
-		const result: monaco.editor.IRelatedInformation[] = [];
+		const result: editor.IRelatedInformation[] = [];
 		relatedInformation.forEach((info) => {
-			let relatedResource: monaco.editor.ITextModel | null = model;
+			let relatedResource: editor.ITextModel | null = model;
 			if (info.file) {
-				const relatedResourceUri = monaco.Uri.parse(info.file.fileName);
-				relatedResource = monaco.editor.getModel(relatedResourceUri);
+				const relatedResourceUri = Uri.parse(info.file.fileName);
+				relatedResource = this._libFiles.getOrCreateModel(relatedResourceUri);
 			}
 
 			if (!relatedResource) {
@@ -232,8 +347,12 @@ export class DiagnosticsAdapter extends Adapter {
 			}
 			const infoStart = info.start || 0;
 			const infoLength = info.length || 1;
-			const { lineNumber: startLineNumber, column: startColumn } = relatedResource.getPositionAt(infoStart);
-			const { lineNumber: endLineNumber, column: endColumn } = relatedResource.getPositionAt(infoStart + infoLength);
+			const { lineNumber: startLineNumber, column: startColumn } = relatedResource.getPositionAt(
+				infoStart
+			);
+			const { lineNumber: endLineNumber, column: endColumn } = relatedResource.getPositionAt(
+				infoStart + infoLength
+			);
 
 			result.push({
 				resource: relatedResource.uri,
@@ -247,34 +366,48 @@ export class DiagnosticsAdapter extends Adapter {
 		return result;
 	}
 
-	private _tsDiagnosticCategoryToMarkerSeverity(category: ts.DiagnosticCategory): monaco.MarkerSeverity {
+	private _tsDiagnosticCategoryToMarkerSeverity(category: ts.DiagnosticCategory): MarkerSeverity {
 		switch (category) {
-			case DiagnosticCategory.Error: return monaco.MarkerSeverity.Error
-			case DiagnosticCategory.Message: return monaco.MarkerSeverity.Info
-			case DiagnosticCategory.Warning: return monaco.MarkerSeverity.Warning
-			case DiagnosticCategory.Suggestion: return monaco.MarkerSeverity.Hint
+			case DiagnosticCategory.Error:
+				return MarkerSeverity.Error;
+			case DiagnosticCategory.Message:
+				return MarkerSeverity.Info;
+			case DiagnosticCategory.Warning:
+				return MarkerSeverity.Warning;
+			case DiagnosticCategory.Suggestion:
+				return MarkerSeverity.Hint;
 		}
-		return monaco.MarkerSeverity.Info;
+		return MarkerSeverity.Info;
 	}
 }
 
 // --- suggest ------
 
-interface MyCompletionItem extends monaco.languages.CompletionItem {
+interface MyCompletionItem extends languages.CompletionItem {
 	label: string;
 	uri: Uri;
 	position: Position;
+	offset: number;
 }
 
-export class SuggestAdapter extends Adapter implements monaco.languages.CompletionItemProvider {
-
+export class SuggestAdapter extends Adapter implements languages.CompletionItemProvider {
 	public get triggerCharacters(): string[] {
 		return ['.'];
 	}
 
-	public async provideCompletionItems(model: monaco.editor.ITextModel, position: Position, _context: monaco.languages.CompletionContext, token: CancellationToken): Promise<monaco.languages.CompletionList | undefined> {
+	public async provideCompletionItems(
+		model: editor.ITextModel,
+		position: Position,
+		_context: languages.CompletionContext,
+		token: CancellationToken
+	): Promise<languages.CompletionList | undefined> {
 		const wordInfo = model.getWordUntilPosition(position);
-		const wordRange = new Range(position.lineNumber, wordInfo.startColumn, position.lineNumber, wordInfo.endColumn);
+		const wordRange = new Range(
+			position.lineNumber,
+			wordInfo.startColumn,
+			position.lineNumber,
+			wordInfo.endColumn
+		);
 		const resource = model.uri;
 		const offset = model.getOffsetAt(position);
 
@@ -285,7 +418,7 @@ export class SuggestAdapter extends Adapter implements monaco.languages.Completi
 			return;
 		}
 
-		const suggestions: MyCompletionItem[] = info.entries.map(entry => {
+		const suggestions: MyCompletionItem[] = info.entries.map((entry) => {
 			let range = wordRange;
 			if (entry.replacementSpan) {
 				const p1 = model.getPositionAt(entry.replacementSpan.start);
@@ -293,14 +426,21 @@ export class SuggestAdapter extends Adapter implements monaco.languages.Completi
 				range = new Range(p1.lineNumber, p1.column, p2.lineNumber, p2.column);
 			}
 
+			const tags: languages.CompletionItemTag[] = [];
+			if (entry.kindModifiers?.indexOf('deprecated') !== -1) {
+				tags.push(languages.CompletionItemTag.Deprecated);
+			}
+
 			return {
 				uri: resource,
 				position: position,
+				offset: offset,
 				range: range,
 				label: entry.name,
 				insertText: entry.name,
 				sortText: entry.sortText,
-				kind: SuggestAdapter.convertKind(entry.kind)
+				kind: SuggestAdapter.convertKind(entry.kind),
+				tags
 			};
 		});
 
@@ -309,15 +449,22 @@ export class SuggestAdapter extends Adapter implements monaco.languages.Completi
 		};
 	}
 
-	public async resolveCompletionItem(model: monaco.editor.ITextModel, _position: Position, item: monaco.languages.CompletionItem, token: CancellationToken): Promise<monaco.languages.CompletionItem> {
+	public async resolveCompletionItem(
+		item: languages.CompletionItem,
+		token: CancellationToken
+	): Promise<languages.CompletionItem> {
 		const myItem = <MyCompletionItem>item;
 		const resource = myItem.uri;
 		const position = myItem.position;
-		const offset = model.getOffsetAt(position);
+		const offset = myItem.offset;
 
 		const worker = await this._worker(resource);
-		const details = await worker.getCompletionEntryDetails(resource.toString(), offset, myItem.label);
-		if (!details || model.isDisposed()) {
+		const details = await worker.getCompletionEntryDetails(
+			resource.toString(),
+			offset,
+			myItem.label
+		);
+		if (!details) {
 			return myItem;
 		}
 		return <MyCompletionItem>{
@@ -327,50 +474,75 @@ export class SuggestAdapter extends Adapter implements monaco.languages.Completi
 			kind: SuggestAdapter.convertKind(details.kind),
 			detail: displayPartsToString(details.displayParts),
 			documentation: {
-				value: displayPartsToString(details.documentation)
+				value: SuggestAdapter.createDocumentationString(details)
 			}
 		};
 	}
 
-	private static convertKind(kind: string): monaco.languages.CompletionItemKind {
+	private static convertKind(kind: string): languages.CompletionItemKind {
 		switch (kind) {
 			case Kind.primitiveType:
 			case Kind.keyword:
-				return monaco.languages.CompletionItemKind.Keyword;
+				return languages.CompletionItemKind.Keyword;
 			case Kind.variable:
 			case Kind.localVariable:
-				return monaco.languages.CompletionItemKind.Variable;
+				return languages.CompletionItemKind.Variable;
 			case Kind.memberVariable:
 			case Kind.memberGetAccessor:
 			case Kind.memberSetAccessor:
-				return monaco.languages.CompletionItemKind.Field;
+				return languages.CompletionItemKind.Field;
 			case Kind.function:
 			case Kind.memberFunction:
 			case Kind.constructSignature:
 			case Kind.callSignature:
 			case Kind.indexSignature:
-				return monaco.languages.CompletionItemKind.Function;
+				return languages.CompletionItemKind.Function;
 			case Kind.enum:
-				return monaco.languages.CompletionItemKind.Enum;
+				return languages.CompletionItemKind.Enum;
 			case Kind.module:
-				return monaco.languages.CompletionItemKind.Module;
+				return languages.CompletionItemKind.Module;
 			case Kind.class:
-				return monaco.languages.CompletionItemKind.Class;
+				return languages.CompletionItemKind.Class;
 			case Kind.interface:
-				return monaco.languages.CompletionItemKind.Interface;
+				return languages.CompletionItemKind.Interface;
 			case Kind.warning:
-				return monaco.languages.CompletionItemKind.File;
+				return languages.CompletionItemKind.File;
 		}
 
-		return monaco.languages.CompletionItemKind.Property;
+		return languages.CompletionItemKind.Property;
+	}
+
+	private static createDocumentationString(details: ts.CompletionEntryDetails): string {
+		let documentationString = displayPartsToString(details.documentation);
+		if (details.tags) {
+			for (const tag of details.tags) {
+				documentationString += `\n\n${tagToString(tag)}`;
+			}
+		}
+		return documentationString;
 	}
 }
 
-export class SignatureHelpAdapter extends Adapter implements monaco.languages.SignatureHelpProvider {
+function tagToString(tag: ts.JSDocTagInfo): string {
+	let tagLabel = `*@${tag.name}*`;
+	if (tag.name === 'param' && tag.text) {
+		const [paramName, ...rest] = tag.text.split(' ');
+		tagLabel += `\`${paramName}\``;
+		if (rest.length > 0) tagLabel += ` — ${rest.join(' ')}`;
+	} else if (tag.text) {
+		tagLabel += ` — ${tag.text}`;
+	}
+	return tagLabel;
+}
 
+export class SignatureHelpAdapter extends Adapter implements languages.SignatureHelpProvider {
 	public signatureHelpTriggerCharacters = ['(', ','];
 
-	public async provideSignatureHelp(model: monaco.editor.ITextModel, position: Position, token: CancellationToken): Promise<monaco.languages.SignatureHelpResult | undefined> {
+	public async provideSignatureHelp(
+		model: editor.ITextModel,
+		position: Position,
+		token: CancellationToken
+	): Promise<languages.SignatureHelpResult | undefined> {
 		const resource = model.uri;
 		const offset = model.getOffsetAt(position);
 		const worker = await this._worker(resource);
@@ -380,26 +552,29 @@ export class SignatureHelpAdapter extends Adapter implements monaco.languages.Si
 			return;
 		}
 
-		const ret: monaco.languages.SignatureHelp = {
+		const ret: languages.SignatureHelp = {
 			activeSignature: info.selectedItemIndex,
 			activeParameter: info.argumentIndex,
 			signatures: []
 		};
 
-		info.items.forEach(item => {
-
-			const signature: monaco.languages.SignatureInformation = {
+		info.items.forEach((item) => {
+			const signature: languages.SignatureInformation = {
 				label: '',
 				parameters: []
 			};
 
-			signature.documentation = displayPartsToString(item.documentation);
+			signature.documentation = {
+				value: displayPartsToString(item.documentation)
+			};
 			signature.label += displayPartsToString(item.prefixDisplayParts);
 			item.parameters.forEach((p, i, a) => {
 				const label = displayPartsToString(p.displayParts);
-				const parameter: monaco.languages.ParameterInformation = {
+				const parameter: languages.ParameterInformation = {
 					label: label,
-					documentation: displayPartsToString(p.documentation)
+					documentation: {
+						value: displayPartsToString(p.documentation)
+					}
 				};
 				signature.label += label;
 				signature.parameters.push(parameter);
@@ -413,16 +588,19 @@ export class SignatureHelpAdapter extends Adapter implements monaco.languages.Si
 
 		return {
 			value: ret,
-			dispose() { }
+			dispose() {}
 		};
 	}
 }
 
 // --- hover ------
 
-export class QuickInfoAdapter extends Adapter implements monaco.languages.HoverProvider {
-
-	public async provideHover(model: monaco.editor.ITextModel, position: Position, token: CancellationToken): Promise<monaco.languages.Hover | undefined> {
+export class QuickInfoAdapter extends Adapter implements languages.HoverProvider {
+	public async provideHover(
+		model: editor.ITextModel,
+		position: Position,
+		token: CancellationToken
+	): Promise<languages.Hover | undefined> {
 		const resource = model.uri;
 		const offset = model.getOffsetAt(position);
 		const worker = await this._worker(resource);
@@ -433,32 +611,32 @@ export class QuickInfoAdapter extends Adapter implements monaco.languages.HoverP
 		}
 
 		const documentation = displayPartsToString(info.documentation);
-		const tags = info.tags ? info.tags.map(tag => {
-			const label = `*@${tag.name}*`;
-			if (!tag.text) {
-				return label;
-			}
-			return label + (tag.text.match(/\r\n|\n/g) ? ' \n' + tag.text : ` - ${tag.text}`);
-		}).join('  \n\n') : '';
+		const tags = info.tags ? info.tags.map((tag) => tagToString(tag)).join('  \n\n') : '';
 		const contents = displayPartsToString(info.displayParts);
 		return {
 			range: this._textSpanToRange(model, info.textSpan),
-			contents: [{
-				value: '```js\n' + contents + '\n```\n'
-			}, {
-				value: documentation + (tags ? '\n\n' + tags : '')
-			}]
+			contents: [
+				{
+					value: '```typescript\n' + contents + '\n```\n'
+				},
+				{
+					value: documentation + (tags ? '\n\n' + tags : '')
+				}
+			]
 		};
 	}
 }
 
 // --- occurrences ------
 
-export class OccurrencesAdapter extends Adapter implements monaco.languages.DocumentHighlightProvider {
-
-	public async provideDocumentHighlights(model: monaco.editor.ITextModel, position: Position, token: CancellationToken): Promise<monaco.languages.DocumentHighlight[] | undefined> {
+export class OccurrencesAdapter extends Adapter implements languages.DocumentHighlightProvider {
+	public async provideDocumentHighlights(
+		model: editor.ITextModel,
+		position: Position,
+		token: CancellationToken
+	): Promise<languages.DocumentHighlight[] | undefined> {
 		const resource = model.uri;
-		const offset = model.getOffsetAt(position)
+		const offset = model.getOffsetAt(position);
 		const worker = await this._worker(resource);
 		const entries = await worker.getOccurrencesAtPosition(resource.toString(), offset);
 
@@ -466,10 +644,12 @@ export class OccurrencesAdapter extends Adapter implements monaco.languages.Docu
 			return;
 		}
 
-		return entries.map(entry => {
-			return <monaco.languages.DocumentHighlight>{
+		return entries.map((entry) => {
+			return <languages.DocumentHighlight>{
 				range: this._textSpanToRange(model, entry.textSpan),
-				kind: entry.isWriteAccess ? monaco.languages.DocumentHighlightKind.Write : monaco.languages.DocumentHighlightKind.Text
+				kind: entry.isWriteAccess
+					? languages.DocumentHighlightKind.Write
+					: languages.DocumentHighlightKind.Text
 			};
 		});
 	}
@@ -478,8 +658,18 @@ export class OccurrencesAdapter extends Adapter implements monaco.languages.Docu
 // --- definition ------
 
 export class DefinitionAdapter extends Adapter {
+	constructor(
+		private readonly _libFiles: LibFiles,
+		worker: (...uris: Uri[]) => Promise<TypeScriptWorker>
+	) {
+		super(worker);
+	}
 
-	public async provideDefinition(model: monaco.editor.ITextModel, position: Position, token: CancellationToken): Promise<monaco.languages.Definition | undefined> {
+	public async provideDefinition(
+		model: editor.ITextModel,
+		position: Position,
+		token: CancellationToken
+	): Promise<languages.Definition | undefined> {
 		const resource = model.uri;
 		const offset = model.getOffsetAt(position);
 		const worker = await this._worker(resource);
@@ -489,10 +679,19 @@ export class DefinitionAdapter extends Adapter {
 			return;
 		}
 
-		const result: monaco.languages.Location[] = [];
+		// Fetch lib files if necessary
+		await this._libFiles.fetchLibFilesIfNecessary(
+			entries.map((entry) => Uri.parse(entry.fileName))
+		);
+
+		if (model.isDisposed()) {
+			return;
+		}
+
+		const result: languages.Location[] = [];
 		for (let entry of entries) {
 			const uri = Uri.parse(entry.fileName);
-			const refModel = monaco.editor.getModel(uri);
+			const refModel = this._libFiles.getOrCreateModel(uri);
 			if (refModel) {
 				result.push({
 					uri: uri,
@@ -506,9 +705,20 @@ export class DefinitionAdapter extends Adapter {
 
 // --- references ------
 
-export class ReferenceAdapter extends Adapter implements monaco.languages.ReferenceProvider {
+export class ReferenceAdapter extends Adapter implements languages.ReferenceProvider {
+	constructor(
+		private readonly _libFiles: LibFiles,
+		worker: (...uris: Uri[]) => Promise<TypeScriptWorker>
+	) {
+		super(worker);
+	}
 
-	public async provideReferences(model: monaco.editor.ITextModel, position: Position, context: monaco.languages.ReferenceContext, token: CancellationToken): Promise<monaco.languages.Location[] | undefined> {
+	public async provideReferences(
+		model: editor.ITextModel,
+		position: Position,
+		context: languages.ReferenceContext,
+		token: CancellationToken
+	): Promise<languages.Location[] | undefined> {
 		const resource = model.uri;
 		const offset = model.getOffsetAt(position);
 		const worker = await this._worker(resource);
@@ -518,10 +728,19 @@ export class ReferenceAdapter extends Adapter implements monaco.languages.Refere
 			return;
 		}
 
-		const result: monaco.languages.Location[] = [];
+		// Fetch lib files if necessary
+		await this._libFiles.fetchLibFilesIfNecessary(
+			entries.map((entry) => Uri.parse(entry.fileName))
+		);
+
+		if (model.isDisposed()) {
+			return;
+		}
+
+		const result: languages.Location[] = [];
 		for (let entry of entries) {
 			const uri = Uri.parse(entry.fileName);
-			const refModel = monaco.editor.getModel(uri);
+			const refModel = this._libFiles.getOrCreateModel(uri);
 			if (refModel) {
 				result.push({
 					uri: uri,
@@ -535,9 +754,11 @@ export class ReferenceAdapter extends Adapter implements monaco.languages.Refere
 
 // --- outline ------
 
-export class OutlineAdapter extends Adapter implements monaco.languages.DocumentSymbolProvider {
-
-	public async provideDocumentSymbols(model: monaco.editor.ITextModel, token: CancellationToken): Promise<monaco.languages.DocumentSymbol[] | undefined> {
+export class OutlineAdapter extends Adapter implements languages.DocumentSymbolProvider {
+	public async provideDocumentSymbols(
+		model: editor.ITextModel,
+		token: CancellationToken
+	): Promise<languages.DocumentSymbol[] | undefined> {
 		const resource = model.uri;
 		const worker = await this._worker(resource);
 		const items = await worker.getNavigationBarItems(resource.toString());
@@ -546,11 +767,15 @@ export class OutlineAdapter extends Adapter implements monaco.languages.Document
 			return;
 		}
 
-		const convert = (bucket: monaco.languages.DocumentSymbol[], item: ts.NavigationBarItem, containerLabel?: string): void => {
-			let result: monaco.languages.DocumentSymbol = {
+		const convert = (
+			bucket: languages.DocumentSymbol[],
+			item: ts.NavigationBarItem,
+			containerLabel?: string
+		): void => {
+			let result: languages.DocumentSymbol = {
 				name: item.text,
 				detail: '',
-				kind: <monaco.languages.SymbolKind>(outlineTypeTable[item.kind] || monaco.languages.SymbolKind.Variable),
+				kind: <languages.SymbolKind>(outlineTypeTable[item.kind] || languages.SymbolKind.Variable),
 				range: this._textSpanToRange(model, item.spans[0]),
 				selectionRange: this._textSpanToRange(model, item.spans[0]),
 				tags: [],
@@ -564,10 +789,10 @@ export class OutlineAdapter extends Adapter implements monaco.languages.Document
 			}
 
 			bucket.push(result);
-		}
+		};
 
-		let result: monaco.languages.DocumentSymbol[] = [];
-		items.forEach(item => convert(result, item));
+		let result: languages.DocumentSymbol[] = [];
+		items.forEach((item) => convert(result, item));
 		return result;
 	}
 }
@@ -603,26 +828,28 @@ export class Kind {
 	public static warning: string = 'warning';
 }
 
-let outlineTypeTable: { [kind: string]: monaco.languages.SymbolKind } = Object.create(null);
-outlineTypeTable[Kind.module] = monaco.languages.SymbolKind.Module;
-outlineTypeTable[Kind.class] = monaco.languages.SymbolKind.Class;
-outlineTypeTable[Kind.enum] = monaco.languages.SymbolKind.Enum;
-outlineTypeTable[Kind.interface] = monaco.languages.SymbolKind.Interface;
-outlineTypeTable[Kind.memberFunction] = monaco.languages.SymbolKind.Method;
-outlineTypeTable[Kind.memberVariable] = monaco.languages.SymbolKind.Property;
-outlineTypeTable[Kind.memberGetAccessor] = monaco.languages.SymbolKind.Property;
-outlineTypeTable[Kind.memberSetAccessor] = monaco.languages.SymbolKind.Property;
-outlineTypeTable[Kind.variable] = monaco.languages.SymbolKind.Variable;
-outlineTypeTable[Kind.const] = monaco.languages.SymbolKind.Variable;
-outlineTypeTable[Kind.localVariable] = monaco.languages.SymbolKind.Variable;
-outlineTypeTable[Kind.variable] = monaco.languages.SymbolKind.Variable;
-outlineTypeTable[Kind.function] = monaco.languages.SymbolKind.Function;
-outlineTypeTable[Kind.localFunction] = monaco.languages.SymbolKind.Function;
+let outlineTypeTable: {
+	[kind: string]: languages.SymbolKind;
+} = Object.create(null);
+outlineTypeTable[Kind.module] = languages.SymbolKind.Module;
+outlineTypeTable[Kind.class] = languages.SymbolKind.Class;
+outlineTypeTable[Kind.enum] = languages.SymbolKind.Enum;
+outlineTypeTable[Kind.interface] = languages.SymbolKind.Interface;
+outlineTypeTable[Kind.memberFunction] = languages.SymbolKind.Method;
+outlineTypeTable[Kind.memberVariable] = languages.SymbolKind.Property;
+outlineTypeTable[Kind.memberGetAccessor] = languages.SymbolKind.Property;
+outlineTypeTable[Kind.memberSetAccessor] = languages.SymbolKind.Property;
+outlineTypeTable[Kind.variable] = languages.SymbolKind.Variable;
+outlineTypeTable[Kind.const] = languages.SymbolKind.Variable;
+outlineTypeTable[Kind.localVariable] = languages.SymbolKind.Variable;
+outlineTypeTable[Kind.variable] = languages.SymbolKind.Variable;
+outlineTypeTable[Kind.function] = languages.SymbolKind.Function;
+outlineTypeTable[Kind.localFunction] = languages.SymbolKind.Function;
 
 // --- formatting ----
 
 export abstract class FormatHelper extends Adapter {
-	protected static _convertOptions(options: monaco.languages.FormattingOptions): ts.FormatCodeOptions {
+	protected static _convertOptions(options: languages.FormattingOptions): ts.FormatCodeOptions {
 		return {
 			ConvertTabsToSpaces: options.insertSpaces,
 			TabSize: options.tabSize,
@@ -642,7 +869,10 @@ export abstract class FormatHelper extends Adapter {
 		};
 	}
 
-	protected _convertTextChanges(model: monaco.editor.ITextModel, change: ts.TextChange): monaco.languages.TextEdit {
+	protected _convertTextChanges(
+		model: editor.ITextModel,
+		change: ts.TextChange
+	): languages.TextEdit {
 		return {
 			text: change.newText,
 			range: this._textSpanToRange(model, change.span)
@@ -650,76 +880,129 @@ export abstract class FormatHelper extends Adapter {
 	}
 }
 
-export class FormatAdapter extends FormatHelper implements monaco.languages.DocumentRangeFormattingEditProvider {
-
-	public async provideDocumentRangeFormattingEdits(model: monaco.editor.ITextModel, range: Range, options: monaco.languages.FormattingOptions, token: CancellationToken): Promise<monaco.languages.TextEdit[] | undefined> {
+export class FormatAdapter
+	extends FormatHelper
+	implements languages.DocumentRangeFormattingEditProvider {
+	public async provideDocumentRangeFormattingEdits(
+		model: editor.ITextModel,
+		range: Range,
+		options: languages.FormattingOptions,
+		token: CancellationToken
+	): Promise<languages.TextEdit[] | undefined> {
 		const resource = model.uri;
-		const startOffset = model.getOffsetAt({ lineNumber: range.startLineNumber, column: range.startColumn });
-		const endOffset = model.getOffsetAt({ lineNumber: range.endLineNumber, column: range.endColumn });
+		const startOffset = model.getOffsetAt({
+			lineNumber: range.startLineNumber,
+			column: range.startColumn
+		});
+		const endOffset = model.getOffsetAt({
+			lineNumber: range.endLineNumber,
+			column: range.endColumn
+		});
 		const worker = await this._worker(resource);
-		const edits = await worker.getFormattingEditsForRange(resource.toString(), startOffset, endOffset, FormatHelper._convertOptions(options));
+		const edits = await worker.getFormattingEditsForRange(
+			resource.toString(),
+			startOffset,
+			endOffset,
+			FormatHelper._convertOptions(options)
+		);
 
 		if (!edits || model.isDisposed()) {
 			return;
 		}
 
-		return edits.map(edit => this._convertTextChanges(model, edit));
+		return edits.map((edit) => this._convertTextChanges(model, edit));
 	}
 }
 
-export class FormatOnTypeAdapter extends FormatHelper implements monaco.languages.OnTypeFormattingEditProvider {
-
+export class FormatOnTypeAdapter
+	extends FormatHelper
+	implements languages.OnTypeFormattingEditProvider {
 	get autoFormatTriggerCharacters() {
 		return [';', '}', '\n'];
 	}
 
-	public async provideOnTypeFormattingEdits(model: monaco.editor.ITextModel, position: Position, ch: string, options: monaco.languages.FormattingOptions, token: CancellationToken): Promise<monaco.languages.TextEdit[] | undefined> {
+	public async provideOnTypeFormattingEdits(
+		model: editor.ITextModel,
+		position: Position,
+		ch: string,
+		options: languages.FormattingOptions,
+		token: CancellationToken
+	): Promise<languages.TextEdit[] | undefined> {
 		const resource = model.uri;
 		const offset = model.getOffsetAt(position);
 		const worker = await this._worker(resource);
-		const edits = await worker.getFormattingEditsAfterKeystroke(resource.toString(), offset, ch, FormatHelper._convertOptions(options));
+		const edits = await worker.getFormattingEditsAfterKeystroke(
+			resource.toString(),
+			offset,
+			ch,
+			FormatHelper._convertOptions(options)
+		);
 
 		if (!edits || model.isDisposed()) {
 			return;
 		}
 
-		return edits.map(edit => this._convertTextChanges(model, edit));
+		return edits.map((edit) => this._convertTextChanges(model, edit));
 	}
 }
 
 // --- code actions ------
 
-export class CodeActionAdaptor extends FormatHelper implements monaco.languages.CodeActionProvider {
-
-	public async provideCodeActions(model: monaco.editor.ITextModel, range: Range, context: monaco.languages.CodeActionContext, token: CancellationToken): Promise<monaco.languages.CodeActionList> {
+export class CodeActionAdaptor extends FormatHelper implements languages.CodeActionProvider {
+	public async provideCodeActions(
+		model: editor.ITextModel,
+		range: Range,
+		context: languages.CodeActionContext,
+		token: CancellationToken
+	): Promise<languages.CodeActionList> {
 		const resource = model.uri;
-		const start = model.getOffsetAt({ lineNumber: range.startLineNumber, column: range.startColumn });
-		const end = model.getOffsetAt({ lineNumber: range.endLineNumber, column: range.endColumn });
+		const start = model.getOffsetAt({
+			lineNumber: range.startLineNumber,
+			column: range.startColumn
+		});
+		const end = model.getOffsetAt({
+			lineNumber: range.endLineNumber,
+			column: range.endColumn
+		});
 		const formatOptions = FormatHelper._convertOptions(model.getOptions());
-		const errorCodes = context.markers.filter(m => m.code).map(m => m.code).map(Number);
+		const errorCodes = context.markers
+			.filter((m) => m.code)
+			.map((m) => m.code)
+			.map(Number);
 		const worker = await this._worker(resource);
-		const codeFixes = await worker.getCodeFixesAtPosition(resource.toString(), start, end, errorCodes, formatOptions);
+		const codeFixes = await worker.getCodeFixesAtPosition(
+			resource.toString(),
+			start,
+			end,
+			errorCodes,
+			formatOptions
+		);
 
 		if (!codeFixes || model.isDisposed()) {
-			return { actions: [], dispose:() => {} };
+			return { actions: [], dispose: () => {} };
 		}
 
-		const actions = codeFixes.filter(fix => {
-			// Removes any 'make a new file'-type code fix
-			return fix.changes.filter(change => change.isNewFile).length === 0;
-		}).map(fix => {
-			return this._tsCodeFixActionToMonacoCodeAction(model, context, fix);
-		});
+		const actions = codeFixes
+			.filter((fix) => {
+				// Removes any 'make a new file'-type code fix
+				return fix.changes.filter((change) => change.isNewFile).length === 0;
+			})
+			.map((fix) => {
+				return this._tsCodeFixActionToMonacoCodeAction(model, context, fix);
+			});
 
 		return {
 			actions: actions,
-			dispose: () => { }
+			dispose: () => {}
 		};
 	}
 
-
-	private _tsCodeFixActionToMonacoCodeAction(model: monaco.editor.ITextModel, context: monaco.languages.CodeActionContext, codeFix: ts.CodeFixAction): monaco.languages.CodeAction {
-		const edits: monaco.languages.WorkspaceTextEdit[] = [];
+	private _tsCodeFixActionToMonacoCodeAction(
+		model: editor.ITextModel,
+		context: languages.CodeActionContext,
+		codeFix: ts.CodeFixAction
+	): languages.CodeAction {
+		const edits: languages.WorkspaceTextEdit[] = [];
 		for (const change of codeFix.changes) {
 			for (const textChange of change.textChanges) {
 				edits.push({
@@ -732,11 +1015,11 @@ export class CodeActionAdaptor extends FormatHelper implements monaco.languages.
 			}
 		}
 
-		const action: monaco.languages.CodeAction = {
+		const action: languages.CodeAction = {
 			title: codeFix.description,
 			edit: { edits: edits },
 			diagnostics: context.markers,
-			kind: "quickfix"
+			kind: 'quickfix'
 		};
 
 		return action;
@@ -744,35 +1027,48 @@ export class CodeActionAdaptor extends FormatHelper implements monaco.languages.
 }
 // --- rename ----
 
-export class RenameAdapter extends Adapter implements monaco.languages.RenameProvider {
-
-	public async provideRenameEdits(model: monaco.editor.ITextModel, position: Position, newName: string, token: CancellationToken): Promise<monaco.languages.WorkspaceEdit & monaco.languages.Rejection | undefined> {
+export class RenameAdapter extends Adapter implements languages.RenameProvider {
+	public async provideRenameEdits(
+		model: editor.ITextModel,
+		position: Position,
+		newName: string,
+		token: CancellationToken
+	): Promise<(languages.WorkspaceEdit & languages.Rejection) | undefined> {
 		const resource = model.uri;
 		const fileName = resource.toString();
 		const offset = model.getOffsetAt(position);
 		const worker = await this._worker(resource);
 
-		const renameInfo = await worker.getRenameInfo(fileName, offset, { allowRenameOfImportPath: false });
-		if (renameInfo.canRename === false) { // use explicit comparison so that the discriminated union gets resolved properly
+		const renameInfo = await worker.getRenameInfo(fileName, offset, {
+			allowRenameOfImportPath: false
+		});
+		if (renameInfo.canRename === false) {
+			// use explicit comparison so that the discriminated union gets resolved properly
 			return {
 				edits: [],
 				rejectReason: renameInfo.localizedErrorMessage
 			};
 		}
 		if (renameInfo.fileToRename !== undefined) {
-			throw new Error("Renaming files is not supported.");
+			throw new Error('Renaming files is not supported.');
 		}
 
-		const renameLocations = await worker.findRenameLocations(fileName, offset, /*strings*/ false, /*comments*/ false, /*prefixAndSuffix*/ false);
+		const renameLocations = await worker.findRenameLocations(
+			fileName,
+			offset,
+			/*strings*/ false,
+			/*comments*/ false,
+			/*prefixAndSuffix*/ false
+		);
 
 		if (!renameLocations || model.isDisposed()) {
 			return;
 		}
 
-		const edits: monaco.languages.WorkspaceTextEdit[] = [];
+		const edits: languages.WorkspaceTextEdit[] = [];
 		for (const renameLocation of renameLocations) {
 			edits.push({
-				resource: monaco.Uri.parse(renameLocation.fileName),
+				resource: Uri.parse(renameLocation.fileName),
 				edit: {
 					range: this._textSpanToRange(model, renameLocation.textSpan),
 					text: newName

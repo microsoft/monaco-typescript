@@ -4,31 +4,30 @@
  *--------------------------------------------------------------------------------------------*/
 'use strict';
 
-import { LanguageServiceDefaultsImpl } from './monaco.contribution';
-import { TypeScriptWorker } from './tsWorker';
-
-import IDisposable = monaco.IDisposable;
-import Uri = monaco.Uri;
+import { LanguageServiceDefaults } from './monaco.contribution';
+import type { TypeScriptWorker } from './tsWorker';
+import { editor, Uri, IDisposable } from './fillers/monaco-editor-core';
 
 export class WorkerManager {
-
 	private _modeId: string;
-	private _defaults: LanguageServiceDefaultsImpl;
+	private _defaults: LanguageServiceDefaults;
 	private _configChangeListener: IDisposable;
 	private _updateExtraLibsToken: number;
 	private _extraLibsChangeListener: IDisposable;
 
-	private _worker: monaco.editor.MonacoWebWorker<TypeScriptWorker> | null;
+	private _worker: editor.MonacoWebWorker<TypeScriptWorker> | null;
 	private _client: Promise<TypeScriptWorker> | null;
 
-	constructor(modeId: string, defaults: LanguageServiceDefaultsImpl) {
+	constructor(modeId: string, defaults: LanguageServiceDefaults) {
 		this._modeId = modeId;
 		this._defaults = defaults;
 		this._worker = null;
 		this._client = null;
 		this._configChangeListener = this._defaults.onDidChange(() => this._stopWorker());
 		this._updateExtraLibsToken = 0;
-		this._extraLibsChangeListener = this._defaults.onDidExtraLibsChange(() => this._updateExtraLibs());
+		this._extraLibsChangeListener = this._defaults.onDidExtraLibsChange(() =>
+			this._updateExtraLibs()
+		);
 	}
 
 	private _stopWorker(): void {
@@ -60,8 +59,7 @@ export class WorkerManager {
 
 	private _getClient(): Promise<TypeScriptWorker> {
 		if (!this._client) {
-			this._worker = monaco.editor.createWebWorker<TypeScriptWorker>({
-
+			this._worker = editor.createWebWorker<TypeScriptWorker>({
 				// module that exports the create() method and returns a `TypeScriptWorker` instance
 				moduleId: 'vs/language/typescript/tsWorker',
 
@@ -72,18 +70,21 @@ export class WorkerManager {
 				// passed in to the create() method
 				createData: {
 					compilerOptions: this._defaults.getCompilerOptions(),
-					extraLibs: this._defaults.getExtraLibs()
+					extraLibs: this._defaults.getExtraLibs(),
+					customWorkerPath: this._defaults.workerOptions.customWorkerPath
 				}
 			});
 
 			let p = <Promise<TypeScriptWorker>>this._worker.getProxy();
 
 			if (this._defaults.getEagerModelSync()) {
-				p = p.then(worker => {
+				p = p.then((worker) => {
 					if (this._worker) {
-						return this._worker.withSyncedResources(monaco.editor.getModels()
-							.filter(model => model.getModeId() === this._modeId)
-							.map(model => model.uri)
+						return this._worker.withSyncedResources(
+							editor
+								.getModels()
+								.filter((model) => model.getModeId() === this._modeId)
+								.map((model) => model.uri)
 						);
 					}
 					return worker;
@@ -98,12 +99,15 @@ export class WorkerManager {
 
 	getLanguageServiceWorker(...resources: Uri[]): Promise<TypeScriptWorker> {
 		let _client: TypeScriptWorker;
-		return this._getClient().then((client) => {
-			_client = client
-		}).then(_ => {
-			if (this._worker) {
-				return this._worker.withSyncedResources(resources)
-			}
-		}).then(_ => _client);
+		return this._getClient()
+			.then((client) => {
+				_client = client;
+			})
+			.then((_) => {
+				if (this._worker) {
+					return this._worker.withSyncedResources(resources);
+				}
+			})
+			.then((_) => _client);
 	}
 }
