@@ -166,6 +166,7 @@ enum DiagnosticCategory {
 export class DiagnosticsAdapter extends Adapter {
 	private _disposables: IDisposable[] = [];
 	private _listener: { [uri: string]: IDisposable } = Object.create(null);
+	private _currentModel: editor.ITextModel | null = Object.create(null);
 
 	constructor(
 		private readonly _libFiles: LibFiles,
@@ -205,6 +206,20 @@ export class DiagnosticsAdapter extends Adapter {
 			}
 		};
 
+		const onEditorInstanceModelChange = (e: editor.IModelChangedEvent) => {
+			if(e.newModelUrl) {
+                this._currentModel = editor.getModel(e.newModelUrl)
+				if (this._currentModel) {
+					onModelRemoved(this._currentModel);
+					onModelAdd(this._currentModel);
+				}
+            }
+		}
+		const onDidCreateEditor = (editor: editor.ICodeEditor) => {
+            editor.onDidChangeModel(onEditorInstanceModelChange)
+        }
+		this._disposables.push(editor.onDidCreateEditor(onDidCreateEditor))
+
 		this._disposables.push(editor.onDidCreateModel(onModelAdd));
 		this._disposables.push(editor.onWillDisposeModel(onModelRemoved));
 		this._disposables.push(
@@ -224,9 +239,20 @@ export class DiagnosticsAdapter extends Adapter {
 
 		const recomputeDiagostics = () => {
 			// redo diagnostics when options change
-			for (const model of editor.getModels()) {
-				onModelRemoved(model);
-				onModelAdd(model);
+			const {
+				experimentalMultipleFilesDiagnostics
+			} = this._defaults.getDiagnosticsOptions();
+			if (experimentalMultipleFilesDiagnostics) {
+				if (this._currentModel) {
+					onModelRemoved(this._currentModel);
+					onModelAdd(this._currentModel);
+				}
+			}
+			else {
+				for (const model of editor.getModels()) {
+					onModelRemoved(model);
+					onModelAdd(model);
+				}
 			}
 		};
 		this._disposables.push(this._defaults.onDidChange(recomputeDiagostics));
