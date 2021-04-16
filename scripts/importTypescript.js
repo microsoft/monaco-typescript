@@ -100,7 +100,7 @@ export const typescriptVersion = "${typeScriptDependencyVersion}";\n`
 // MONACOCHANGE
 // Defining the entire module name because r.js has an issue and cannot bundle this file
 // correctly with an anonymous define call
-define("vs/language/typescript/lib/typescriptServices", [], function() { return ts; });
+define("vs/language/nemotypescript/lib/typescriptServices", [], function() { return ts; });
 // END MONACOCHANGE
 `;
 	fs.writeFileSync(

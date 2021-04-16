@@ -10,25 +10,10 @@ import { LanguageServiceDefaults } from './monaco.contribution';
 import * as languageFeatures from './languageFeatures';
 import { languages, Uri } from './fillers/monaco-editor-core';
 
-let javaScriptWorker: (...uris: Uri[]) => Promise<TypeScriptWorker>;
 let typeScriptWorker: (...uris: Uri[]) => Promise<TypeScriptWorker>;
 
 export function setupTypeScript(defaults: LanguageServiceDefaults): void {
-	typeScriptWorker = setupMode(defaults, 'typescript');
-}
-
-export function setupJavaScript(defaults: LanguageServiceDefaults): void {
-	javaScriptWorker = setupMode(defaults, 'javascript');
-}
-
-export function getJavaScriptWorker(): Promise<(...uris: Uri[]) => Promise<TypeScriptWorker>> {
-	return new Promise((resolve, reject) => {
-		if (!javaScriptWorker) {
-			return reject('JavaScript not registered!');
-		}
-
-		resolve(javaScriptWorker);
-	});
+	typeScriptWorker = setupMode(defaults, 'nemotypescript');
 }
 
 export function getTypeScriptWorker(): Promise<(...uris: Uri[]) => Promise<TypeScriptWorker>> {

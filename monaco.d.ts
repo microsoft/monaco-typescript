@@ -5,7 +5,7 @@
 
 /// <reference path="node_modules/monaco-editor-core/monaco.d.ts" />
 
-declare namespace monaco.languages.typescript {
+declare namespace monaco.languages.nemotypescript {
 	export enum ModuleKind {
 		None = 0,
 		CommonJS = 1,
@@ -19,7 +19,9 @@ declare namespace monaco.languages.typescript {
 		None = 0,
 		Preserve = 1,
 		React = 2,
-		ReactNative = 3
+		ReactNative = 3,
+		ReactJSX = 4,
+		ReactJSXDev = 5
 	}
 	export enum NewLineKind {
 		CarriageReturnLineFeed = 0,
@@ -400,7 +402,5 @@ declare namespace monaco.languages.typescript {
 	}
 	export const typescriptVersion: string;
 	export const typescriptDefaults: LanguageServiceDefaults;
-	export const javascriptDefaults: LanguageServiceDefaults;
 	export const getTypeScriptWorker: () => Promise<(...uris: Uri[]) => Promise<TypeScriptWorker>>;
-	export const getJavaScriptWorker: () => Promise<(...uris: Uri[]) => Promise<TypeScriptWorker>>;
 }

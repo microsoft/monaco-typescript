@@ -22,7 +22,7 @@ let result = [
 	``,
 	`/// <reference path="node_modules/monaco-editor-core/monaco.d.ts" />`,
 	``,
-	`declare namespace monaco.languages.typescript {`
+	`declare namespace monaco.languages.nemotypescript {`
 ];
 for (let line of lines) {
 	if (/^import/.test(line)) {

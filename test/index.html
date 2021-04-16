@@ -20,9 +20,9 @@
 		<script>
 			const paths = {
 				'vs/basic-languages': '../node_modules/monaco-languages/release/dev',
-				'vs/language/typescript/fillers/monaco-editor-core':
+				'vs/language/nemotypescript/fillers/monaco-editor-core':
 					'../out/amd/fillers/monaco-editor-core-amd',
-				'vs/language/typescript': '../out/amd',
+				'vs/language/nemotypescript': '../out/amd',
 				vs: '../node_modules/monaco-editor-core/dev/vs'
 			};
 			if (document.location.protocol === 'http:') {
@@ -30,7 +30,7 @@
 				let testIndex = document.location.pathname.indexOf('/test/');
 				if (testIndex !== -1) {
 					let prefix = document.location.pathname.substr(0, testIndex);
-					paths['vs/language/typescript'] = prefix + '/out/amd';
+					paths['vs/language/nemotypescript'] = prefix + '/out/amd';
 				}
 			}
 			self.require = {
@@ -176,14 +176,14 @@
 			}
 			require([
 				'vs/basic-languages/monaco.contribution',
-				'vs/language/typescript/monaco.contribution'
+				'vs/language/nemotypescript/monaco.contribution'
 			], () => {
 				const editor = monaco.editor.create(document.getElementById('container'), {
 					value: localStorage.getItem('code') || getDefaultCode(),
-					language: 'typescript',
+					language: 'nemotypescript',
 					lightbulb: { enabled: true }
 				});
-
+				debugger;
 				editor.onDidChangeModelContent(() => {
 					const code = editor.getModel().getValue();
 					localStorage.setItem('code', code);
@@ -197,11 +197,16 @@
 					localStorage.getItem('compiler-opts') ||
 					JSON.stringify(getDefaultComplierOpts(), null, 4);
 				document.getElementById('compilerOpts').textContent = optsString;
-				monaco.languages.typescript.typescriptDefaults.setCompilerOptions(JSON.parse(optsString));
+				debugger;
+				monaco.languages.nemotypescript.typescriptDefaults.setCompilerOptions(
+					JSON.parse(optsString)
+				);
 
 				document.getElementById('updateCompilerSettingsBtn').onclick = () => {
 					const newOpts = document.getElementById('compilerOpts').value;
-					monaco.languages.typescript.typescriptDefaults.setCompilerOptions(JSON.parse(newOpts));
+					monaco.languages.nemotypescript.typescriptDefaults.setCompilerOptions(
+						JSON.parse(newOpts)
+					);
 					localStorage.setItem('compiler-opts', newOpts);
 				};
 			});

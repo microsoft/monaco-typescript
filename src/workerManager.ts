@@ -61,7 +61,7 @@ export class WorkerManager {
 		if (!this._client) {
 			this._worker = editor.createWebWorker<TypeScriptWorker>({
 				// module that exports the create() method and returns a `TypeScriptWorker` instance
-				moduleId: 'vs/language/typescript/tsWorker',
+				moduleId: 'vs/language/nemotypescript/tsWorker',
 
 				label: this._modeId,
 

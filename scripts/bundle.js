@@ -26,19 +26,19 @@ const BUNDLED_FILE_HEADER = [
 ].join('\n');
 
 bundleOne('monaco.contribution');
-bundleOne('tsMode', ['vs/language/typescript/monaco.contribution']);
+bundleOne('tsMode', ['vs/language/nemotypescript/monaco.contribution']);
 bundleOne('tsWorker');
 
 function bundleOne(moduleId, exclude) {
 	requirejs.optimize(
 		{
 			baseUrl: 'out/amd/',
-			name: 'vs/language/typescript/' + moduleId,
+			name: 'vs/language/nemotypescript/' + moduleId,
 			out: 'release/dev/' + moduleId + '.js',
 			exclude: exclude,
 			paths: {
 				'vs/language/typescript': REPO_ROOT + '/out/amd',
-				'vs/language/typescript/fillers/monaco-editor-core':
+				'vs/language/nemotypescript/fillers/monaco-editor-core':
 					REPO_ROOT + '/out/amd/fillers/monaco-editor-core-amd'
 			},
 			optimize: 'none'

@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 'use strict';
-
+import './monaco-languages/monaco.contribution';
 import type * as mode from './tsMode';
 import { typescriptVersion as tsversion } from './lib/typescriptServicesMetadata'; // do not import the whole typescriptServices here
 import { languages, Emitter, IEvent, IDisposable, Uri } from './fillers/monaco-editor-core';
@@ -619,22 +619,13 @@ export const typescriptDefaults: LanguageServiceDefaults = new LanguageServiceDe
 	{}
 );
 
-export const javascriptDefaults: LanguageServiceDefaults = new LanguageServiceDefaultsImpl(
-	{ allowNonTsExtensions: true, allowJs: true, target: ScriptTarget.Latest },
-	{ noSemanticValidation: true, noSyntaxValidation: false },
-	{}
-);
-
 export const getTypeScriptWorker = (): Promise<(...uris: Uri[]) => Promise<TypeScriptWorker>> => {
 	return getMode().then((mode) => mode.getTypeScriptWorker());
 };
 
-export const getJavaScriptWorker = (): Promise<(...uris: Uri[]) => Promise<TypeScriptWorker>> => {
-	return getMode().then((mode) => mode.getJavaScriptWorker());
-};
-
+debugger;
 // export to the global based API
-(<any>languages).typescript = {
+(<any>languages).nemotypescript = {
 	ModuleKind,
 	JsxEmit,
 	NewLineKind,
@@ -642,9 +633,7 @@ export const getJavaScriptWorker = (): Promise<(...uris: Uri[]) => Promise<TypeS
 	ModuleResolutionKind,
 	typescriptVersion,
 	typescriptDefaults,
-	javascriptDefaults,
-	getTypeScriptWorker,
-	getJavaScriptWorker
+	getTypeScriptWorker
 };
 
 // --- Registration to monaco editor ---
@@ -653,9 +642,7 @@ function getMode(): Promise<typeof mode> {
 	return import('./tsMode');
 }
 
-languages.onLanguage('typescript', () => {
+languages.onLanguage('nemotypescript', () => {
+	debugger;
 	return getMode().then((mode) => mode.setupTypeScript(typescriptDefaults));
-});
-languages.onLanguage('javascript', () => {
-	return getMode().then((mode) => mode.setupJavaScript(javascriptDefaults));
 });
